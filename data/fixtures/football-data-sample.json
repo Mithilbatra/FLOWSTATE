@@ -1,0 +1,22 @@
+{
+  "id": 497410,
+  "utcDate": "2026-10-24T14:00:00Z",
+  "status": "IN_PLAY",
+  "minute": 67,
+  "competition": { "name": "Primera Division" },
+  "homeTeam": { "name": "Sevilla FC", "shortName": "Sevilla", "tla": "SEV" },
+  "awayTeam": { "name": "Real Betis Balompié", "shortName": "Betis", "tla": "BET" },
+  "score": { "fullTime": { "home": 2, "away": 1 } },
+  "goals": [
+    { "minute": 12, "team": { "name": "Sevilla FC" }, "scorer": { "name": "Lucas Ocampos" } },
+    { "minute": 33, "team": { "name": "Real Betis Balompié" }, "scorer": { "name": "Isco" } },
+    { "minute": 58, "team": { "name": "Sevilla FC" }, "scorer": { "name": "Youssef En-Nesyri" } }
+  ],
+  "bookings": [
+    { "minute": 41, "team": { "name": "Real Betis Balompié" }, "player": { "name": "Germán Pezzella" }, "card": "YELLOW" },
+    { "minute": 64, "team": { "name": "Sevilla FC" }, "player": { "name": "Nemanja Gudelj" }, "card": "RED" }
+  ],
+  "substitutions": [
+    { "minute": 60, "team": { "name": "Real Betis Balompié" }, "playerIn": { "name": "Borja Iglesias" }, "playerOut": { "name": "Willian José" } }
+  ]
+}
