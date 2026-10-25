@@ -20,6 +20,15 @@ const XG_PER_CHANCE = 0.12;
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 const isHex = (s: string | null): s is string => !!s && /^#[0-9a-f]{6}$/i.test(s);
 
+/** "MCI", "Man City" and "Manchester City" are one team: same first letter, and the short form's letters appear in order in the long one. */
+export function sameTeam(a: string, b: string) {
+  const [short, long] = [norm(a), norm(b)].sort((x, y) => x.length - y.length);
+  if (!short || short[0] !== long[0]) return false;
+  let i = 0;
+  for (const ch of long) if (ch === short[i]) i++;
+  return i === short.length;
+}
+
 /** "67:12" -> 68, "45+2" -> 47, "34'" -> 34. Null when unreadable. */
 export function parseClock(clock: string | null): number | null {
   if (!clock) return null;
@@ -52,14 +61,25 @@ export class ScreenTracker {
   private events: MatchEvent[] = [];
   private lastEventAt = new Map<string, number>();
   private lastSeen = 0;
+  private lastFrame = 0;
+  private clockSeen = false;
+  private pendingMinute: number | null = null;
+  private scoreSeen = false;
+  private pendingScore: string | null = null;
 
   /** Teams are known and a match was recognised recently. */
   detected(now = Date.now()) {
     return this.teams !== null && now - this.lastSeen < STALE_MS;
   }
 
+  /** No frames at all for a while: the scan was closed without pressing stop. */
+  idle(now = Date.now()) {
+    return now - this.lastFrame > STALE_MS;
+  }
+
   apply(r: ScreenRead, now = Date.now()) {
     this.frames++;
+    this.lastFrame = now;
     if (!r.football_visible) return;
     if (r.home_team && r.away_team) this.setTeams(r.home_team, r.away_team);
     if (!this.teams) return; // need one scoreboard read before tracking anything
@@ -72,7 +92,7 @@ export class ScreenTracker {
     // Replays, adverts and studio shots repeat old action; don't sample them.
     if (r.is_replay) return;
 
-    this.minute = parseClock(r.clock) ?? this.minute;
+    this.readClock(r.clock);
     if (r.period === 'half_time') this.status = 'halftime';
     else if (r.period === 'full_time') this.status = 'finished';
     else if (r.period !== 'unknown') this.status = 'live';
@@ -94,26 +114,57 @@ export class ScreenTracker {
 
   private setTeams(home: string, away: string) {
     const cur = this.teams;
-    if (cur && (norm(home) === norm(cur.home.name) || norm(away) === norm(cur.away.name))) return;
-    // Both names changed: a different match is on screen, start over.
-    Object.assign(this, new ScreenTracker(), { frames: this.frames });
+    // Graphics name teams differently (scoreboard "MCI", line-up card "Manchester City"); that is not a new match.
+    if (cur && (sameTeam(home, cur.home.name) || sameTeam(away, cur.away.name))) return;
+    // Both teams changed: a different match is on screen, start over.
+    Object.assign(this, new ScreenTracker(), { frames: this.frames, lastFrame: this.lastFrame });
     this.teams = { home: { name: home }, away: { name: away } };
   }
 
+  private readClock(clock: string | null) {
+    const minute = parseClock(clock);
+    if (minute === null) return;
+    // Small forward steps are normal play; any other jump (a misread, or seeking the video) must be read twice in a row.
+    if (!this.clockSeen || (minute >= this.minute && minute <= this.minute + 2) || minute === this.pendingMinute) {
+      this.minute = minute;
+      this.clockSeen = true;
+      this.pendingMinute = null;
+    } else {
+      this.pendingMinute = minute;
+    }
+  }
+
   private readScore(r: ScreenRead) {
+    const next = { home: r.home_score!, away: r.away_score! };
+    // Joined mid-match: goals before the first read weren't seen, so they get no events.
+    if (!this.scoreSeen) {
+      this.scoreSeen = true;
+      this.score = next;
+      return;
+    }
+    if (next.home === this.score.home && next.away === this.score.away) {
+      this.pendingScore = null;
+      return;
+    }
+    // A change counts once a second frame agrees, so one misread digit can't fake a goal.
+    const key = `${next.home}-${next.away}`;
+    if (this.pendingScore !== key) {
+      this.pendingScore = key;
+      return;
+    }
+    this.pendingScore = null;
     for (const side of ['home', 'away'] as Side[]) {
-      const next = side === 'home' ? r.home_score! : r.away_score!;
       // Goals come from the scoreboard changing, so each goal is counted exactly once.
-      for (let g = this.score[side]; g < next; g++) {
+      for (let g = this.score[side]; g < next[side]; g++) {
         const scorer = r.event === 'goal' && r.event_team === side ? r.event_player ?? undefined : undefined;
         this.addEvent('goal', side, scorer, `Goal! ${scorer ?? this.teams![side].name}`);
       }
       // A lower score means a goal was ruled out (VAR): drop the latest goal for that side.
-      for (let g = this.score[side]; g > next; g--) {
+      for (let g = this.score[side]; g > next[side]; g--) {
         const idx = this.events.findLastIndex((e) => e.type === 'goal' && e.side === side);
         if (idx >= 0) this.events.splice(idx, 1);
       }
-      this.score[side] = next;
+      this.score[side] = next[side];
     }
   }
 

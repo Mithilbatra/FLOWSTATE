@@ -111,6 +111,8 @@ export class Hub {
   }
 
   private async tick(advance: boolean) {
+    // The overlay was closed (or crashed) without pressing stop: frames stopped arriving, so end the scan.
+    if (this.screen?.idle()) this.screen = null;
     if (this.screen?.detected()) {
       this.source = 'screen';
       this.publish(this.screen.toMatch());
@@ -173,7 +175,8 @@ export class Hub {
       insights = [{ id: 'live-read', tone: 'neutral' as const, title: 'On your screen', text: base.screen.caption }, ...insights].slice(0, 4);
       summary = `${base.screen.caption} ${summary}`;
     }
-    const notice = this.screen && !this.screen.detected() ? 'Scanning your screen — no football match recognised yet.' : this.notice;
+    // Live-API notices describe the demo fallback, so they never belong on screen data.
+    const notice = base.mode === 'screen' ? undefined : this.screen ? 'Scanning your screen — no football match recognised yet.' : this.notice;
     this.latest = { ...base, momentum, insights, summary, notice, updatedAt: Date.now() };
     this.listeners.forEach((fn) => fn(this.latest!));
   }

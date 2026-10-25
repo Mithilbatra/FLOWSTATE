@@ -67,6 +67,31 @@ describe('Hub screen mode', () => {
     expect(hub.current()!.notice).toMatch(/Scanning your screen/);
   });
 
+  it('ends the scan when frames stop arriving, and clears the scanning notice', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const hub = new Hub(loadConfig({}), async () => read({ football_visible: false }));
+      await hub.ingestFrame('AAAA');
+      expect(hub.current()!.notice).toMatch(/Scanning your screen/);
+      vi.setSystemTime(Date.now() + 61_000);
+      await tick(hub);
+      expect(hub.current()!.mode).toBe('demo');
+      expect(hub.current()!.notice).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not show a live-API error banner over screen data', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ message: 'bad token' }, 403)));
+    const hub = new Hub({ ...loadConfig({}), mode: 'live', apiKey: 'bad' }, async () => read());
+    await hub.refresh();
+    expect(hub.current()!.notice).toMatch(/Live API unavailable/);
+    await hub.ingestFrame('AAAA');
+    expect(hub.current()!.mode).toBe('screen');
+    expect(hub.current()!.notice).toBeUndefined();
+  });
+
   it('reads one frame at a time', async () => {
     let release!: () => void;
     const hub = new Hub(loadConfig({}), () => new Promise((resolve) => (release = () => resolve(read()))));

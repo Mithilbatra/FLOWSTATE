@@ -3,9 +3,9 @@ import type { Match, Team } from '../types/match';
 import { minuteLabel } from '../utils/format';
 import { ModeBadge } from './ModeBadge';
 
-function TeamBlock({ team, align }: { team: Team; align: 'left' | 'right' }) {
+function TeamBlock({ team, side }: { team: Team; side: 'home' | 'away' }) {
   return (
-    <div className={`mh-team mh-${align}`}>
+    <div className={`mh-team mh-${side}`}>
       <span className="mh-dot" style={{ background: team.color, color: team.color }} aria-hidden />
       <div>
         <div className="mh-name">{team.name}</div>
@@ -28,13 +28,13 @@ export function MatchHeader({ match }: { match: Match }) {
         </span>
       </div>
       <div className="mh-teams">
-        <TeamBlock team={match.home} align="right" />
+        <TeamBlock team={match.home} side="home" />
         <div className="score" aria-label={`Score ${match.score.home} to ${match.score.away}`}>
           <span className="digit">{match.score.home}</span>
           <i className="slash" aria-hidden />
           <span className="digit">{match.score.away}</span>
         </div>
-        <TeamBlock team={match.away} align="left" />
+        <TeamBlock team={match.away} side="away" />
       </div>
     </header>
   );

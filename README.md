@@ -67,7 +67,7 @@ How it works:
   - Gemini: the same schema as JSON Schema (`responseJsonSchema`).
   - Both readers check the answer against the same zod schema before using it.
 - `backend/screen.ts` accumulates the reads:
-  - **Score, clock and goals** come from the scoreboard. A goal is recorded when the score goes up, so each goal counts exactly once, and a VAR-cancelled goal is removed when the score goes back down.
+  - **Score, clock and goals** come from the scoreboard. A goal is recorded when the score goes up, so each goal counts exactly once, and a VAR-cancelled goal is removed when the score goes back down. A score change or a clock jump only counts once two frames in a row agree, so one misread digit can't fake a goal. Goals scored before you started scanning are shown in the score but get no events.
   - **Possession** is the share of frames where each team had the ball. **Pressure and chances** come from frames in the final third, and drive the flow meter.
   - **Cards, subs, corners and offsides** come from on-screen graphics. Each one counts once, even if the graphic stays up for several frames.
   - **Broadcast stat graphics** (possession, shots, corners, xG, …) replace the estimates whenever they are shown.
@@ -141,7 +141,7 @@ Key decisions:
 
 ## What is real, what is estimated
 
-- **football-data.org free tier** provides fixtures, scores and (on some competitions or plans) goals, bookings and substitutions. It has no possession, shots, xG, formations or player stats, so those are **derived estimates**, badged **Estimated stats**.
+- **football-data.org free tier** provides fixtures, scores and (on some competitions or plans) goals, bookings and substitutions. It has no possession, shots, xG, formations or player stats. Possession, shots and xG are **derived estimates** from the score, badged **Estimated stats**. Fouls, corners, offsides, pass accuracy, pressing and attack lanes would only be guesses from the minute, so they show as "—".
 - **Screen scan**: the score, clock and teams are what the broadcast shows. Possession and pressure are sampled from frames. xG is roughly 0.12 per detected chance unless the broadcast shows real xG. Unmeasurable stats show "—".
 - **Demo**: the simulator produces plausible values for everything, including tracking-style stats (pressing, passing lanes), so the full product can be demonstrated.
 - **The analyst** is a deterministic rule engine (`backend/insights.ts`). It works offline, is testable and never invents facts. In screen mode, Claude adds one caption card describing the current frame.
@@ -188,7 +188,7 @@ The Gemini reader is tested against a mocked SDK: request shape, schema validati
 
 - State is **in memory in one process**: no database and no history across restarts.
 - Screen scanning reads one frame per 10 s, so very quick events (a card shown for 3 s) can be missed. The rest follows from the scoreboard.
-- The live football-data path has been tested against a recorded fixture, not a live key. Screen scanning has been tested with a fake reader, not against a real broadcast.
+- The live football-data path has run against the real API once (a Série A match), plus a recorded fixture in tests. Screen scanning has read one synthetic frame through Gemini, plus fake readers in tests, but has not been run against a real broadcast.
 - Electron is run via `npx electron`, with no installer or packaging. Without the macOS 15 system picker, Electron shares the whole primary screen.
 - `.npmrc` sets `legacy-peer-deps=true` to avoid an npm peer-resolution crash with the current Vite/Vitest versions. The peers that matter (`react-is`, `@testing-library/dom`) are installed explicitly.
 - The display fonts load from Google Fonts. Offline, it falls back to system fonts.

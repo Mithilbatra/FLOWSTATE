@@ -23,6 +23,11 @@ describe('fromFootballData', () => {
     expect(m.players).toEqual([]);
   });
 
+  it('marks stats the free tier cannot supply as missing instead of inventing equal numbers', () => {
+    expect(m.missing).toEqual(expect.arrayContaining(['fouls', 'corners', 'passAccuracy', 'pressing']));
+    expect(m.missing).not.toContain('possession');
+  });
+
   it('builds a sorted event list with the right sides and card counts', () => {
     expect(m.events.map((e) => e.minute)).toEqual([12, 33, 41, 58, 60, 64]);
     expect(m.events[0]).toMatchObject({ type: 'goal', side: 'home', player: 'Lucas Ocampos' });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeRead, parseClock, ScreenTracker } from '../backend/screen';
+import { describeRead, parseClock, sameTeam, ScreenTracker } from '../backend/screen';
 import type { ScreenRead } from '../backend/vision';
 
 const noStats = {
@@ -30,6 +30,16 @@ describe('parseClock', () => {
   });
 });
 
+describe('sameTeam', () => {
+  it('matches abbreviations and short names, not different clubs', () => {
+    expect(sameTeam('MCI', 'Manchester City')).toBe(true);
+    expect(sameTeam('Man City', 'MCI')).toBe(true);
+    expect(sameTeam('ARS', 'Arsenal')).toBe(true);
+    expect(sameTeam('MUN', 'Manchester City')).toBe(false);
+    expect(sameTeam('CHE', 'Arsenal')).toBe(false);
+  });
+});
+
 describe('ScreenTracker', () => {
   it('needs a scoreboard before it reports a match, then lapses when frames stop', () => {
     const t = new ScreenTracker();
@@ -54,9 +64,63 @@ describe('ScreenTracker', () => {
 
   it('removes a goal when the score goes back down (VAR)', () => {
     const t = new ScreenTracker();
-    t.apply(frame({ home_score: 1 }), 0);
-    t.apply(frame({ home_score: 0 }), 10_000);
+    t.apply(frame(), 0);
+    t.apply(frame({ home_score: 1 }), 10_000);
+    t.apply(frame({ home_score: 1 }), 20_000);
+    expect(t.toMatch().events.filter((e) => e.type === 'goal')).toHaveLength(1);
+    t.apply(frame({ home_score: 0 }), 30_000);
+    t.apply(frame({ home_score: 0 }), 40_000);
     expect(t.toMatch().events.filter((e) => e.type === 'goal')).toHaveLength(0);
+  });
+
+  it('ignores a single misread score or clock', () => {
+    const t = new ScreenTracker();
+    t.apply(frame(), 0);
+    t.apply(frame({ away_score: 8, clock: '83:00' }), 10_000);
+    // Right after the bad frame: no phantom goals (and no GOAL animation), clock unchanged.
+    let m = t.toMatch();
+    expect(m.score).toEqual({ home: 0, away: 0 });
+    expect(m.events).toHaveLength(0);
+    expect(m.minute).toBe(10);
+    t.apply(frame({ clock: '10:20' }), 20_000);
+    m = t.toMatch();
+    expect(m.score).toEqual({ home: 0, away: 0 });
+    expect(m.minute).toBe(11);
+  });
+
+  it('follows a seek in the video once two frames agree on the new clock', () => {
+    const t = new ScreenTracker();
+    t.apply(frame(), 0);
+    t.apply(frame({ clock: '70:05' }), 10_000);
+    expect(t.toMatch().minute).toBe(10);
+    t.apply(frame({ clock: '70:15' }), 20_000);
+    expect(t.toMatch().minute).toBe(71);
+  });
+
+  it('does not invent goal events for the score it finds when joining mid-match', () => {
+    const t = new ScreenTracker();
+    t.apply(frame({ home_score: 2, away_score: 1 }), 0);
+    const m = t.toMatch();
+    expect(m.score).toEqual({ home: 2, away: 1 });
+    expect(m.events).toHaveLength(0);
+  });
+
+  it('keeps the match when a graphic uses full team names', () => {
+    const t = new ScreenTracker();
+    t.apply(frame(), 0);
+    t.apply(frame({ home_score: 1 }), 10_000);
+    t.apply(frame({ home_score: 1 }), 20_000);
+    t.apply(frame({ home_team: 'Manchester City', away_team: 'Arsenal', home_score: 1 }), 30_000);
+    const m = t.toMatch();
+    expect(m.home.name).toBe('MCI');
+    expect(m.events.filter((e) => e.type === 'goal')).toHaveLength(1);
+  });
+
+  it('goes idle when frames stop arriving', () => {
+    const t = new ScreenTracker();
+    t.apply(frame(), 0);
+    expect(t.idle(30_000)).toBe(false);
+    expect(t.idle(61_000)).toBe(true);
   });
 
   it('ignores replays for score, clock and sampling', () => {

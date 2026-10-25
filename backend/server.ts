@@ -17,6 +17,11 @@ const cfg = loadConfig();
 const hub = new Hub(cfg);
 const app = express();
 
+// Only answer requests addressed to this machine by name. A web page using DNS rebinding arrives with its own
+// host name, and must not be able to drive the API (screen frames spend your vision-model quota).
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : res.status(403).end()));
+
 // Screen frames are ~200 KB JPEGs, so this route gets its own body limit (registered before the 4 KB default).
 app.post('/api/screen/frame', express.json({ limit: '4mb' }), async (req, res) => {
   const image = req.body?.image;
@@ -28,8 +33,11 @@ app.post('/api/screen/frame', express.json({ limit: '4mb' }), async (req, res) =
   } catch (err) {
     if (err instanceof BusyError) return res.status(429).json({ error: err.message });
     if (err instanceof VisionUnavailableError) return res.status(503).json({ error: err.message });
-    console.warn('[screen] frame failed:', (err as Error).message);
-    res.status(502).json({ error: 'Could not analyse that frame; will try the next one.' });
+    const message = (err as Error).message;
+    console.warn('[screen] frame failed:', message);
+    // Show the provider's own reason (e.g. "credit balance is too low", "quota exceeded"), not a generic line.
+    const reason = message.match(/"message"\s*:\s*"([^"]+)"/)?.[1] ?? message;
+    res.status(502).json({ error: `Frame not analysed: ${reason.slice(0, 200)}` });
   }
 });
 
@@ -74,7 +82,7 @@ if (fs.existsSync(dist)) {
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
-  if (req.url?.startsWith('/stream')) wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws));
+  if (req.url?.startsWith('/stream') && LOCAL_HOST.test(req.headers.host ?? '')) wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws));
   else socket.destroy();
 });
 wss.on('connection', (ws) => {

@@ -190,5 +190,7 @@ export function fromFootballData(m: FootballDataMatch, now = Date.now()): BaseMa
     players: [],
     mode: 'live',
     estimated: true,
+    // These estimates depend only on the minute, so both teams get the same made-up number: show "—" instead.
+    missing: ['fouls', 'corners', 'offsides', 'passAccuracy', 'pressing', 'passingLanes', 'attackZones'],
   };
 }
