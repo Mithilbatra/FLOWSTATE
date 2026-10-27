@@ -15,6 +15,20 @@ It ships as:
 
 The look is an anime-inspired "Ego Mode": electric blue on black, speed lines, cut-corner panels, a VS-screen header and a full-screen **GOAL** slash whenever someone scores.
 
+## Screenshots
+
+The built-in demo match (simulated data, labelled `DEMO MODE`).
+
+![Match view: VS header with the score, match data bars and the Ego analyst's insights](docs/screenshots/match.png)
+
+| Metavision (tactics) | Rankings (players) |
+| --- | --- |
+| ![Metavision view: head-to-head radar, formations on a pitch and attack lanes](docs/screenshots/metavision.png) | ![Rankings view: player weapons and the ego rankings table](docs/screenshots/rankings.png) |
+
+| Compact overlay | Onboarding |
+| --- | --- |
+| ![Compact always-on-top overlay with score, possession, xG and the Scan my screen button](docs/screenshots/overlay.png) | ![Onboarding screen: choose demo or live data](docs/screenshots/onboarding.png) |
+
 No key is needed to try it. **Demo mode** runs a seeded live-match simulator, clearly labelled `DEMO MODE`.
 
 ## Quick start
