@@ -30,6 +30,15 @@ describe('buildInsights', () => {
     expect(summary).toContain(base.home.name);
   });
 
+  it('does not quote pass accuracy or pressing when the source cannot measure them (audit #1)', () => {
+    const s = withStats({ ...quiet, possession: 64, pressing: 90 }, { ...quiet, possession: 36, pressing: 40 });
+    const measured = buildInsights(s).insights;
+    expect(measured.find((x) => x.id === 'possession')?.text).toMatch(/pass accuracy/);
+    const screenLike = buildInsights({ ...s, missing: ['passAccuracy', 'pressing'] }).insights;
+    expect(screenLike.find((x) => x.id === 'possession')?.text).not.toMatch(/pass accuracy/);
+    expect(screenLike.some((x) => x.id === 'pressing')).toBe(false);
+  });
+
   it('flags the most dangerous attacking channel', () => {
     const { insights } = buildInsights(withStats(quiet, { ...quiet, dangerousAttacks: 12, attackZones: { left: 60, center: 10, right: 30 } }));
     const i = insights.find((x) => x.id === 'zone');

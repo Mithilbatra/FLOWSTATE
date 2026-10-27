@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Stand-in for Google's SDK: records the request and returns whatever the test queues.
@@ -15,6 +16,7 @@ vi.mock('@google/genai', () => ({
 
 const { ApiError } = await import('@google/genai');
 const { readFrame, VisionUnavailableError } = await import('../backend/vision');
+const { loadConfig } = await import('../backend/config');
 
 const read = {
   football_visible: true, is_replay: false, competition: null, home_team: 'MCI', away_team: 'ARS',
@@ -27,6 +29,7 @@ const read = {
 beforeEach(() => vi.stubEnv('GEMINI_API_KEY', 'test-key'));
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   gemini.generateContent.mockReset();
 });
 
@@ -61,5 +64,14 @@ describe('readFrame with a gemini model', () => {
     gemini.generateContent.mockRejectedValue(new (ApiError as unknown as new (s: number, m: string) => Error)(429, 'Resource exhausted'));
     const err = await readFrame('AAAA', 'gemini-3.8-flash').catch((e) => e);
     expect(err).not.toBeInstanceOf(VisionUnavailableError);
+  });
+});
+
+describe('readFrame with the default model (audit #11)', () => {
+  it('stops scanning when the provider rejects the key', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'test-key');
+    const body = JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 401, headers: { 'content-type': 'application/json' } })));
+    await expect(readFrame('AAAA', loadConfig({}).screenModel)).rejects.toBeInstanceOf(VisionUnavailableError);
   });
 });

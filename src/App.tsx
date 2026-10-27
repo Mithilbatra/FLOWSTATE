@@ -4,10 +4,10 @@ import { Controls } from './components/Controls';
 import { GoalBurst } from './components/GoalBurst';
 import { MatchHeader } from './components/MatchHeader';
 import { Onboarding } from './components/Onboarding';
+import { PlayerStats } from './components/PlayerStats';
 import { useMatchStream } from './hooks/useMatchStream';
 import { useSettings } from './hooks/useSettings';
 import { Overview } from './views/Overview';
-import { Players } from './views/Players';
 import { Tactical } from './views/Tactical';
 
 // ?compact=1 is the floating overlay window (browser pop-out or Electron).
@@ -59,7 +59,7 @@ export default function App() {
       <main>
         {settings.view === 'overview' && <Overview match={match} showAI={settings.showAI} />}
         {settings.view === 'tactical' && <Tactical match={match} showAI={settings.showAI} />}
-        {settings.view === 'players' && <Players match={match} />}
+        {settings.view === 'players' && <PlayerStats match={match} />}
       </main>
       <GoalBurst match={match} />
     </div>

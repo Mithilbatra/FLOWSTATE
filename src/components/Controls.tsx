@@ -15,7 +15,7 @@ const LINK_LABEL: Record<LinkState, string> = {
   offline: 'Backend offline — retrying',
 };
 
-export const openOverlay = () => window.open('/?compact=1', 'flowstate-overlay', 'popup,width=400,height=440');
+const openOverlay = () => window.open('/?compact=1', 'flowstate-overlay', 'popup,width=400,height=440');
 
 interface Props {
   settings: Settings;

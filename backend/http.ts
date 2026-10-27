@@ -1,4 +1,4 @@
-export interface RetryOptions {
+interface RetryOptions {
   retries?: number;
   baseDelayMs?: number;
   timeoutMs?: number;
@@ -6,7 +6,10 @@ export interface RetryOptions {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** GET JSON with a timeout and exponential backoff. 4xx (except 429) are not retried. */
+/**
+ * GET JSON with a timeout and exponential backoff for 5xx and network errors. 4xx are not retried: a 429 retried
+ * after 0.4 s only burns more of the rate limit, and the next poll comes 15 s later anyway.
+ */
 export async function fetchJson<T>(
   url: string,
   init: RequestInit = {},
@@ -18,7 +21,7 @@ export async function fetchJson<T>(
       const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
       if (res.ok) return (await res.json()) as T;
       const err = new Error(`HTTP ${res.status} from ${new URL(url).host}`);
-      if (res.status < 500 && res.status !== 429) throw Object.assign(err, { fatal: true });
+      if (res.status < 500) throw Object.assign(err, { fatal: true });
       lastError = err;
     } catch (err) {
       if ((err as { fatal?: boolean }).fatal) throw err;

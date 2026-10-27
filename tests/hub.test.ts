@@ -50,7 +50,7 @@ describe('Hub screen mode', () => {
 
   it('publishes what was read from the screen, then returns to demo when stopped', async () => {
     const hub = new Hub(loadConfig({}), async () => read());
-    await expect(hub.ingestFrame('AAAA')).resolves.toBe('BAR 1–0 RMA · 55:10 · RMA attacking');
+    await expect(hub.ingestFrame('AAAA')).resolves.toEqual({ read: 'BAR 1–0 RMA · 55:10 · RMA attacking', football: true });
     const m = hub.current()!;
     expect(m.mode).toBe('screen');
     expect(m.score).toEqual({ home: 1, away: 0 });
@@ -73,7 +73,7 @@ describe('Hub screen mode', () => {
       const hub = new Hub(loadConfig({}), async () => read({ football_visible: false }));
       await hub.ingestFrame('AAAA');
       expect(hub.current()!.notice).toMatch(/Scanning your screen/);
-      vi.setSystemTime(Date.now() + 61_000);
+      vi.setSystemTime(Date.now() + 601_000);
       await tick(hub);
       expect(hub.current()!.mode).toBe('demo');
       expect(hub.current()!.notice).toBeUndefined();
@@ -90,6 +90,39 @@ describe('Hub screen mode', () => {
     await hub.ingestFrame('AAAA');
     expect(hub.current()!.mode).toBe('screen');
     expect(hub.current()!.notice).toBeUndefined();
+  });
+
+  it('drops a frame that finishes after the user pressed stop (audit #4)', async () => {
+    let release!: (r: ScreenRead) => void;
+    const hub = new Hub(loadConfig({}), () => new Promise((resolve) => (release = resolve)));
+    const inflight = hub.ingestFrame('AAAA');
+    await hub.stopScreen();
+    release(read());
+    await expect(inflight).resolves.toEqual({ read: 'Scan stopped', football: true });
+    expect(hub.current()!.mode).toBe('demo');
+  });
+
+  it('keeps the scan through a paused video, marked as paused (audit #2)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const hub = new Hub(loadConfig({}), async () => read());
+      await hub.ingestFrame('AAAA');
+      await hub.ingestFrame('AAAA');
+      vi.setSystemTime(Date.now() + 61_000); // paused: unchanged frames are not sent
+      await tick(hub);
+      expect(hub.current()!.mode).toBe('screen');
+      expect(hub.current()!.notice).toMatch(/paused/);
+      await hub.ingestFrame('AAAA'); // resumed
+      expect(hub.current()!.screen?.frames).toBe(3);
+      expect(hub.current()!.notice).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tells the overlay when no football was visible (audit #6)', async () => {
+    const hub = new Hub(loadConfig({}), async () => read({ football_visible: false }));
+    await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false });
   });
 
   it('reads one frame at a time', async () => {

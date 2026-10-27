@@ -1,12 +1,13 @@
 // Thin desktop shell: shows the compact overlay in a frameless, transparent, always-on-top window.
 // Start the app first (npm run dev), or use `npm run dev:overlay` to start everything together.
-const { app, BrowserWindow, desktopCapturer, screen, session } = require('electron');
+const { app, BrowserWindow, desktopCapturer, dialog, screen, session } = require('electron');
 
 const URL = process.env.OVERLAY_URL || 'http://localhost:5173/?compact=1';
+let win;
 
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 380,
     height: 420,
     x: workArea.x + workArea.width - 400,
@@ -36,11 +37,22 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // "Scan screen": on macOS 15+ the system picker lets you choose the window with the match.
-  // Where no system picker exists, the primary screen is shared.
+  // "Scan my screen": on macOS 15+ the system picker opens and this handler is skipped. Elsewhere, ask which
+  // window to share instead of silently sending the whole screen; callback(null) denies the request.
   session.defaultSession.setDisplayMediaRequestHandler(
-    (_request, callback) => {
-      desktopCapturer.getSources({ types: ['screen'] }).then((sources) => callback({ video: sources[0] }));
+    async (_request, callback) => {
+      try {
+        const sources = (await desktopCapturer.getSources({ types: ['window', 'screen'] })).slice(0, 10);
+        // Parented to the overlay so it is not hidden behind an always-on-top window.
+        const { response } = await dialog.showMessageBox(win, {
+          message: 'Which window shows the match?',
+          buttons: [...sources.map((s) => s.name), 'Cancel'],
+          cancelId: sources.length,
+        });
+        callback(sources[response] ? { video: sources[response] } : null);
+      } catch {
+        callback(null); // e.g. no screen-recording permission: deny rather than leave the overlay waiting forever
+      }
     },
     { useSystemPicker: true },
   );

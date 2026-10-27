@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, sendFrame, stopScreen } from '../services/api';
 
-export type ScanStatus = 'idle' | 'starting' | 'scanning' | 'error';
-
-export interface ScanState {
-  status: ScanStatus;
+interface ScanState {
+  status: 'idle' | 'starting' | 'scanning' | 'error';
   frames: number;
   lastRead?: string;
   error?: string;
@@ -14,6 +12,11 @@ const INTERVAL_MS = 10_000;
 const MAX_WIDTH = 1280;
 /** Mean per-channel pixel change (0-255) below which a frame counts as unchanged (paused video). */
 const MIN_CHANGE = 3;
+/**
+ * Frames in a row with no football before a forgotten scan stops itself: about 2 minutes if no match was ever seen,
+ * about 20 minutes once one was (half-time studio shows and ad breaks are not football but must not end the scan).
+ */
+const MAX_EMPTY_FRAMES = { neverSeen: 12, afterMatch: 120 };
 
 function thumbnailDiff(a: Uint8ClampedArray, b: Uint8ClampedArray) {
   let sum = 0;
@@ -58,10 +61,16 @@ export function useScreenAnalysis() {
     let previous: Uint8ClampedArray | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let alive = true;
+    let emptyFrames = 0;
+    let seenFootball = false;
+    // Closing the overlay window kills the capture; tell the server now rather than leaving the last reading up.
+    const onLeave = () => navigator.sendBeacon('/api/screen/stop');
+    window.addEventListener('pagehide', onLeave);
 
     cleanupRef.current = () => {
       alive = false;
       clearTimeout(timer);
+      window.removeEventListener('pagehide', onLeave);
       stream.getTracks().forEach((t) => t.stop());
     };
     // The browser's own "Stop sharing" button ends the track.
@@ -69,6 +78,7 @@ export function useScreenAnalysis() {
 
     const tick = async () => {
       if (!alive) return;
+      const started = Date.now();
       if (video.videoWidth) {
         const t = thumb.getContext('2d', { willReadFrequently: true })!;
         t.drawImage(video, 0, 0, thumb.width, thumb.height);
@@ -82,16 +92,24 @@ export function useScreenAnalysis() {
           frame.getContext('2d')!.drawImage(video, 0, 0, frame.width, frame.height);
           const image = frame.toDataURL('image/jpeg', 0.8).split(',')[1];
           try {
-            const { read } = await sendFrame(image);
+            const { read, football } = await sendFrame(image);
+            if (!alive) return; // stopped while this frame was in flight
+            seenFootball ||= football;
+            emptyFrames = football ? 0 : emptyFrames + 1;
+            if (emptyFrames >= MAX_EMPTY_FRAMES[seenFootball ? 'afterMatch' : 'neverSeen']) {
+              return stop(`No football match seen for about ${seenFootball ? 20 : 2} minutes, so scanning stopped to save your quota.`);
+            }
             setState((s) => ({ ...s, status: 'scanning', frames: s.frames + 1, lastRead: read, error: undefined }));
           } catch (err) {
+            if (!alive) return;
             // A missing or rejected key will not fix itself: stop instead of retrying forever.
             if (err instanceof ApiError && err.status === 503) return stop(err.message);
             setState((s) => ({ ...s, error: (err as Error).message }));
           }
         }
       }
-      if (alive) timer = setTimeout(tick, INTERVAL_MS);
+      // A steady 10 s rhythm: the time spent reading the frame counts toward the wait.
+      if (alive) timer = setTimeout(tick, Math.max(0, INTERVAL_MS - (Date.now() - started)));
     };
     setState({ status: 'scanning', frames: 0, lastRead: 'Reading the first frame…' });
     void tick();
