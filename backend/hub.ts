@@ -33,6 +33,8 @@ export class Hub {
   private timer: NodeJS.Timeout | undefined;
   private screen: ScreenTracker | null = null;
   private screenBusy = false;
+  /** Bumped by stopScreen, so a frame that was still being read when the user pressed stop is dropped. */
+  private scanEpoch = 0;
 
   constructor(
     private cfg: Config,
@@ -91,21 +93,27 @@ export class Hub {
     return this.tick(false);
   }
 
-  /** Analyse one frame of the user's screen. One frame at a time: concurrent calls get BusyError. */
+  /**
+   * Analyse one frame of the user's screen. One frame at a time: concurrent calls get BusyError.
+   * `football` tells the overlay whether a match was visible, so it can stop a scan nobody is watching.
+   */
   async ingestFrame(jpegBase64: string) {
     if (this.screenBusy) throw new BusyError('Still reading the previous frame');
     this.screenBusy = true;
+    const epoch = this.scanEpoch;
     try {
       const read = await this.read(jpegBase64, this.cfg.screenModel);
+      if (epoch !== this.scanEpoch) return { read: 'Scan stopped', football: true };
       (this.screen ??= new ScreenTracker()).apply(read);
       await this.tick(false);
-      return describeRead(read);
+      return { read: describeRead(read), football: read.football_visible };
     } finally {
       this.screenBusy = false;
     }
   }
 
   stopScreen() {
+    this.scanEpoch++;
     this.screen = null;
     return this.tick(false);
   }
@@ -176,7 +184,10 @@ export class Hub {
       summary = `${base.screen.caption} ${summary}`;
     }
     // Live-API notices describe the demo fallback, so they never belong on screen data.
-    const notice = base.mode === 'screen' ? undefined : this.screen ? 'Scanning your screen — no football match recognised yet.' : this.notice;
+    const notice =
+      base.mode === 'screen'
+        ? this.screen?.stale() ? 'Screen scan paused — showing the last reading.' : undefined
+        : this.screen ? 'Scanning your screen — no football match recognised yet.' : this.notice;
     this.latest = { ...base, momentum, insights, summary, notice, updatedAt: Date.now() };
     this.listeners.forEach((fn) => fn(this.latest!));
   }

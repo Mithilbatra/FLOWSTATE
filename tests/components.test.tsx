@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CompactOverlay } from '../src/components/CompactOverlay';
 import { EventTimeline } from '../src/components/EventTimeline';
@@ -6,6 +6,7 @@ import { InsightPanel } from '../src/components/InsightPanel';
 import { formationRows } from '../src/components/FormationPitch';
 import { GoalBurst } from '../src/components/GoalBurst';
 import { MatchHeader } from '../src/components/MatchHeader';
+import { Onboarding } from '../src/components/Onboarding';
 import { StatsPanel } from '../src/components/StatsPanel';
 import { topPlayers } from '../src/utils/players';
 import { makeMatch } from './helpers';
@@ -104,5 +105,27 @@ describe('formationRows', () => {
     expect(formationRows('4-2-3-1')).toEqual([1, 4, 2, 3, 1]);
     expect(formationRows('')).toBeNull();
     expect(formationRows('5-5-5')).toBeNull();
+  });
+});
+
+describe('Onboarding (audit #9)', () => {
+  it("starts from the server's mode and keeps its key when the field is left empty", async () => {
+    const calls: { url: string; body?: string }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body as string | undefined });
+      const body = url === '/api/health' ? { ok: true, requestedMode: 'live', hasKey: true } : {};
+      return new Response(JSON.stringify(body), { status: 200 });
+    }));
+    try {
+      const onDone = vi.fn();
+      render(<Onboarding onDone={onDone} />);
+      await waitFor(() => expect(screen.getByRole('radio', { name: /Live fixtures/ })).toBeChecked());
+      expect(screen.getByPlaceholderText(/Leave empty to keep/)).not.toBeRequired();
+      fireEvent.click(screen.getByRole('button', { name: /Enter the field/ }));
+      await waitFor(() => expect(onDone).toHaveBeenCalled());
+      expect(JSON.parse(calls.find((c) => c.url === '/api/config')!.body!)).toEqual({ mode: 'live' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

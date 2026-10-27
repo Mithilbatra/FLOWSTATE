@@ -19,7 +19,7 @@ No key is needed to try it. **Demo mode** runs a seeded live-match simulator, cl
 
 ## Quick start
 
-Requirements: Node 20+ and npm.
+Requirements: Node 20.12+ and npm.
 
 ```bash
 git clone https://github.com/Mithilbatra/FLOWSTATE.git
@@ -56,12 +56,12 @@ Other scripts: `npm test`, `npm run typecheck`.
 2. Open the overlay: **Scan my screen** in the dashboard opens a pop-out, or use `npm run overlay` for the always-on-top window.
 3. In the overlay, press **Scan my screen** and choose the tab or window with the match.
    - In a browser, the browser's own picker opens.
-   - In Electron on macOS 15+, the macOS picker opens. The first time, macOS asks to allow Screen Recording for Electron. On older systems the whole primary screen is shared.
-4. The overlay and dashboard switch to the `SCREEN SCAN` source within one or two frames. Press **Stop scanning**, or stop sharing, to go back.
+   - In Electron on macOS 15+, the macOS picker opens. The first time, macOS asks to allow Screen Recording for Electron. Elsewhere a dialog asks which window to share; nothing is shared without your choice.
+4. The overlay and dashboard switch to the `SCREEN SCAN` source within one or two frames. Press **Stop scanning**, or stop sharing, to go back. So a forgotten scan doesn't keep spending, it stops by itself after about 2 minutes if it never sees football, or about 20 minutes without football once a match was seen (half-time and ad breaks don't end it). Closing the overlay window also stops it.
 
 How it works:
 
-- The browser grabs a frame every 10 s, scales it to 1280 px wide and sends it as a JPEG to the local backend. **Unchanged frames are skipped**, so a paused video costs nothing.
+- The browser grabs a frame every 10 s, scales it to 1280 px wide and sends it as a JPEG to the local backend. **Unchanged frames are skipped**, so a paused video costs nothing. While paused or on an ad break the dashboard keeps the last reading (marked *paused*) for up to 10 minutes, then the scan ends.
 - The backend sends it to the model with a strict JSON schema. It asks only for what is visible: scoreboard text, the clock, team colour swatches, any on-screen stat graphic, who has the ball, how dangerous the play is, and whether it is a replay.
   - Claude: structured outputs, effort `low`, server-side refusal fallback.
   - Gemini: the same schema as JSON Schema (`responseJsonSchema`).
@@ -88,7 +88,7 @@ Copy `.env.example` to `.env` (the backend loads it automatically).
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `PORT` | `3737` | Backend port. The Vite dev server proxies `/api` and `/stream` to it. If you change it, also export `PORT` for `npm run dev`. |
+| `PORT` | `3737` | Backend port. The Vite dev server reads it from `.env` too and proxies `/api` and `/stream` to it. |
 | `DATA_MODE` | `demo` | `demo` = simulator, `live` = football-data.org with automatic fallback to demo. Also switchable from the in-app settings screen. |
 | `FOOTBALL_DATA_API_KEY` | _(empty)_ | Free token from <https://www.football-data.org/client/register>. |
 | `FOOTBALL_DATA_MATCH_ID` | _(empty)_ | Pin a specific match id. Otherwise the first in-play match is used. |
@@ -135,9 +135,9 @@ Key decisions:
 - **One schema, three sources.** Providers return raw payloads, and only the normalizer and the screen tracker know their shapes. The simulator deliberately emits an API-Football-style payload, so the normalizer is exercised in demo mode too.
 - **Vision reads, code decides.** Claude only reports what is in one frame, as schema-checked JSON. Goals, dedupe, replays and possession are plain, tested TypeScript, so a misread frame can't invent a goal twice.
 - **Momentum is derived, not fetched.** `MomentumTracker` turns successive snapshots into per-minute attacking threat: deltas in xG, shots, dangerous attacks and corners, smoothed with an EMA. A side whose threat stays high for three minutes "enters flow".
-- **Graceful degradation.** `fetchJson` retries 5xx/429/network errors with backoff and a timeout, but fails fast on 4xx. Live failures fall back to demo with a notice, and live is retried 15 s after the last attempt *ends*, so slow timeouts can't freeze the fallback. A scan that stops recognising a match lapses back after 60 s. One failing update is logged and never stops the feed.
-- **Cost control.** Only one frame is analysed at a time (extra frames get `429`), unchanged frames are skipped, and frames are downscaled. A missing or rejected Claude key stops scanning with a clear message instead of retrying forever.
-- **Security.** The server binds to `127.0.0.1`. API keys stay on the server (the browser never sees the Claude key), and the football-data key entered in the UI is held in memory only. Request bodies are size-limited and validated.
+- **Graceful degradation.** `fetchJson` retries 5xx and network errors with backoff and a timeout, but fails fast on 4xx, including 429 rate limits (the next poll is 15 s away anyway). Live failures fall back to demo with a notice, and live is retried 15 s after the last attempt *ends*, so slow timeouts can't freeze the fallback. A scan that stops getting frames keeps its last reading for 10 minutes, then lapses back. One failing update is logged and never stops the feed.
+- **Cost control.** Only one frame is analysed at a time (extra frames get `429`), unchanged frames are skipped, and frames are downscaled. A missing or rejected key stops scanning with a clear message instead of retrying forever, and long stretches without football stop it too.
+- **Security.** The server binds to `127.0.0.1` and only answers requests addressed to `localhost` from local pages (a foreign `Host` or `Origin` gets 403), so other websites can't drive it. API keys stay on the server (the browser never sees the vision key), and the football-data key entered in the UI is held in memory only. Request bodies are size-limited and validated, and errors come back as JSON without stack traces.
 
 ## What is real, what is estimated
 
@@ -162,7 +162,7 @@ src/            React app
   services/     REST client
   types/        Shared schema (used by backend too)
   utils/        Formatting and player ranking helpers
-  views/        Match (Overview), Metavision (Tactical), Rankings (Players)
+  views/        Match (Overview), Metavision (Tactical); Rankings is components/PlayerStats
 tests/          Vitest: normalizers, simulator, momentum, insights, retry/cache, hub, screen tracker, UI
 ```
 
@@ -189,7 +189,7 @@ The Gemini reader is tested against a mocked SDK: request shape, schema validati
 - State is **in memory in one process**: no database and no history across restarts.
 - Screen scanning reads one frame per 10 s, so very quick events (a card shown for 3 s) can be missed. The rest follows from the scoreboard.
 - The live football-data path has run against the real API once (a Série A match), plus a recorded fixture in tests. Screen scanning has read one synthetic frame through Gemini, plus fake readers in tests, but has not been run against a real broadcast.
-- Electron is run via `npx electron`, with no installer or packaging. Without the macOS 15 system picker, Electron shares the whole primary screen.
+- Electron is run via `npx electron@45`, with no installer or packaging. The window chooser for systems without the macOS 15 picker is untested here. Electron 45's download script asks for Node 22.12+; on Node 20 it prints `EBADENGINE` warnings but installs and runs.
 - `.npmrc` sets `legacy-peer-deps=true` to avoid an npm peer-resolution crash with the current Vite/Vitest versions. The peers that matter (`react-is`, `@testing-library/dom`) are installed explicitly.
 - The display fonts load from Google Fonts. Offline, it falls back to system fonts.
 

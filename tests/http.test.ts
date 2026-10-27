@@ -22,6 +22,13 @@ describe('fetchJson', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it('does not retry a 429 rate limit (audit #17)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(fetchJson('https://example.com/x', {}, fast)).rejects.toThrow('HTTP 429');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry client errors such as a bad API key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 403 }));
     vi.stubGlobal('fetch', fetchMock);

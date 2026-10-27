@@ -21,9 +21,10 @@ export function useMatchStream() {
     const poll = async () => {
       try {
         setMatch(await getMatch());
-        setLink('polling');
+        // A poll that was already in flight when the socket reconnected must not relabel the link.
+        if (ws?.readyState !== WebSocket.OPEN) setLink('polling');
       } catch {
-        setLink('offline');
+        if (ws?.readyState !== WebSocket.OPEN) setLink('offline');
       }
     };
 

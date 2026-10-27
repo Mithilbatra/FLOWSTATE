@@ -71,10 +71,7 @@ const WEIGHTS: Record<Pos, { touch: number; pass: number; dribble: number; defen
   F: { touch: 0.8, pass: 0.6, dribble: 1.2, defend: 0.2, acc: -0.1 },
 };
 
-const POS_MAP: Record<Pos, 'GK' | 'DF' | 'MF' | 'FW'> = { G: 'GK', D: 'DF', M: 'MF', F: 'FW' };
-export const positionLabel = (p: Pos) => POS_MAP[p];
-
-export function mulberry32(seed: number) {
+function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;

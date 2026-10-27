@@ -28,6 +28,14 @@ describe('parseClock', () => {
     expect(parseClock(null)).toBeNull();
     expect(parseClock('HT')).toBeNull();
   });
+
+  it('reads added time after a stopped main clock (audit #5)', () => {
+    expect(parseClock('45:00 +2')).toBe(47);
+    expect(parseClock('45:00 +1:23')).toBe(47);
+    expect(parseClock("90'+3'")).toBe(93);
+    expect(parseClock('90+3')).toBe(93);
+    expect(parseClock('2H 67:12')).toBe(68);
+  });
 });
 
 describe('sameTeam', () => {
@@ -38,16 +46,25 @@ describe('sameTeam', () => {
     expect(sameTeam('MUN', 'Manchester City')).toBe(false);
     expect(sameTeam('CHE', 'Arsenal')).toBe(false);
   });
+
+  it('works for any script and folds accents (audit #3)', () => {
+    expect(sameTeam('Ολυμπιακός', 'ΟΛΥΜΠΙΑΚΟΣ')).toBe(true);
+    expect(sameTeam('Atlético Madrid', 'Atletico Madrid')).toBe(true);
+    expect(sameTeam('Динамо', 'Спартак')).toBe(false);
+  });
 });
 
 describe('ScreenTracker', () => {
-  it('needs a scoreboard before it reports a match, then lapses when frames stop', () => {
+  it('needs a scoreboard before it reports a match; a minute without one is "stale", ten minutes is gone', () => {
     const t = new ScreenTracker();
     t.apply(frame({ home_team: null, away_team: null }), 0);
     expect(t.detected(0)).toBe(false);
     t.apply(frame(), 1000);
     expect(t.detected(1000)).toBe(true);
-    expect(t.detected(1000 + 61_000)).toBe(false);
+    expect(t.stale(1000)).toBe(false);
+    expect(t.detected(1000 + 61_000)).toBe(true);
+    expect(t.stale(1000 + 61_000)).toBe(true);
+    expect(t.detected(1000 + 601_000)).toBe(false);
   });
 
   it('turns scoreboard changes into goals on the right side, once each', () => {
@@ -116,11 +133,43 @@ describe('ScreenTracker', () => {
     expect(m.events.filter((e) => e.type === 'goal')).toHaveLength(1);
   });
 
-  it('goes idle when frames stop arriving', () => {
+  it('tracks a match whose scoreboard uses Greek names (audit #3)', () => {
+    const t = new ScreenTracker();
+    const g = (o: Partial<ScreenRead> = {}) => frame({ home_team: 'Ολυμπιακός', away_team: 'ΠΑΟΚ', ...o });
+    t.apply(g(), 0);
+    t.apply(g({ home_score: 1 }), 10_000);
+    t.apply(g({ home_score: 1 }), 20_000);
+    const m = t.toMatch();
+    expect(m.score.home).toBe(1);
+    expect(m.events.filter((e) => e.type === 'goal')).toHaveLength(1);
+    expect(m.screen?.frames).toBe(3);
+  });
+
+  it('shows fouls as missing until a stats graphic gives them, and counts offsides (audit #15)', () => {
+    const t = new ScreenTracker();
+    t.apply(frame({ event: 'offside', event_team: 'home' }), 0);
+    let m = t.toMatch();
+    expect(m.missing).toContain('fouls');
+    expect(m.missing).not.toContain('offsides');
+    expect(m.home.stats.offsides).toBe(1);
+    t.apply(frame({ stats: { ...noStats, fouls_home: 7, fouls_away: 9 } }), 10_000);
+    m = t.toMatch();
+    expect(m.missing).not.toContain('fouls');
+    expect(m.away.stats.fouls).toBe(9);
+  });
+
+  it('gives multi-word teams distinct short names', () => {
+    const t = new ScreenTracker();
+    t.apply(frame({ home_team: 'Man City', away_team: 'Man United' }), 0);
+    const m = t.toMatch();
+    expect([m.home.short, m.away.short]).toEqual(['MC', 'MU']);
+  });
+
+  it('goes idle only after ten minutes without any frame', () => {
     const t = new ScreenTracker();
     t.apply(frame(), 0);
-    expect(t.idle(30_000)).toBe(false);
-    expect(t.idle(61_000)).toBe(true);
+    expect(t.idle(61_000)).toBe(false);
+    expect(t.idle(601_000)).toBe(true);
   });
 
   it('ignores replays for score, clock and sampling', () => {

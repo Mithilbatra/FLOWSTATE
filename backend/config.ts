@@ -1,8 +1,7 @@
-import type { DataMode } from '../src/types/match';
-
 export interface Config {
   port: number;
-  mode: DataMode;
+  /** Requested data source; 'screen' is never configured, it takes over while a scan runs. */
+  mode: 'demo' | 'live';
   apiKey: string;
   matchId: string;
   simSpeed: number;

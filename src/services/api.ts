@@ -24,7 +24,9 @@ export const refreshMatch = () => request<Match>('/api/refresh', { method: 'POST
 
 export const saveConfig = (config: { mode: Exclude<DataMode, 'screen'>; apiKey?: string }) => postJson<unknown>('/api/config', config);
 
-/** Send one JPEG frame (base64, no data: prefix); resolves with a one-line description of what was read. */
-export const sendFrame = (image: string) => postJson<{ read: string }>('/api/screen/frame', { image });
+/** Send one JPEG frame (base64, no data: prefix); resolves with a one-line description and whether football was visible. */
+export const sendFrame = (image: string) => postJson<{ read: string; football: boolean }>('/api/screen/frame', { image });
+
+export const getHealth = () => request<{ requestedMode: 'demo' | 'live'; hasKey: boolean }>('/api/health');
 
 export const stopScreen = () => postJson<unknown>('/api/screen/stop', {});

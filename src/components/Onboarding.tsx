@@ -1,14 +1,23 @@
-import { useState, type FormEvent } from 'react';
-import { saveConfig } from '../services/api';
-import type { DataMode } from '../types/match';
+import { useEffect, useState, type FormEvent } from 'react';
+import { getHealth, saveConfig } from '../services/api';
 
 interface Props {
   onDone: (opts: { compact: boolean }) => void;
 }
 
 export function Onboarding({ onDone }: Props) {
-  const [mode, setMode] = useState<Exclude<DataMode, 'screen'>>('demo');
+  const [mode, setMode] = useState<'demo' | 'live'>('demo');
   const [apiKey, setApiKey] = useState('');
+  // The server may already be set up from .env (DATA_MODE=live, FOOTBALL_DATA_API_KEY); start from that, not from demo.
+  const [hasKey, setHasKey] = useState(false);
+  useEffect(() => {
+    getHealth()
+      .then((h) => {
+        setMode(h.requestedMode);
+        setHasKey(h.hasKey);
+      })
+      .catch(() => {});
+  }, []);
   const [compact, setCompact] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -18,7 +27,8 @@ export function Onboarding({ onDone }: Props) {
     setBusy(true);
     setError('');
     try {
-      await saveConfig({ mode, ...(mode === 'live' && { apiKey: apiKey.trim() }) });
+      // An empty key field keeps the key the server already has.
+      await saveConfig({ mode, ...(mode === 'live' && apiKey.trim() && { apiKey: apiKey.trim() }) });
       onDone({ compact });
     } catch (err) {
       setError((err as Error).message);
@@ -52,7 +62,15 @@ export function Onboarding({ onDone }: Props) {
         {mode === 'live' && (
           <label className="field">
             API key
-            <input type="password" required autoComplete="off" spellCheck={false} placeholder="football-data.org token" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+            <input
+              type="password"
+              required={!hasKey}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={hasKey ? 'Leave empty to keep the key from .env' : 'football-data.org token'}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
             <small>Kept in the local server's memory only. If it fails, the app falls back to demo data.</small>
           </label>
         )}

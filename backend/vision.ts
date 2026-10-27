@@ -6,7 +6,7 @@ import { z } from 'zod';
 const count = z.number().nullable();
 
 /** What Claude reads from one broadcast frame. Everything not visible in the frame is null / 'unclear'. */
-export const ScreenReadSchema = z.object({
+const ScreenReadSchema = z.object({
   football_visible: z.boolean(),
   is_replay: z.boolean(),
   competition: z.string().nullable(),

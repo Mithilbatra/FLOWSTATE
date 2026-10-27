@@ -2,8 +2,10 @@ import type { EventType, MatchEvent, Side, TeamStats } from '../src/types/match'
 import type { BaseMatch } from './normalize';
 import type { ScreenRead } from './vision';
 
-/** Without a recognised frame for this long, screen mode lapses and the previous source shows again. */
+/** No recognised frame for this long: the video is probably paused or on an ad break, so say so. */
 const STALE_MS = 60_000;
+/** Keep the scan (and keep showing it) this long without frames, so a paused video or ad break loses nothing. */
+const IDLE_MS = 10 * 60_000;
 /** The same card/sub/corner graphic stays on screen across frames; count it once. */
 const EVENT_DEDUPE_MS = 90_000;
 
@@ -14,10 +16,11 @@ const EVENT_TEXT: Partial<Record<EventType, string>> = {
   yellow: 'Yellow card', red: 'Red card', sub: 'Substitution', corner: 'Corner', offside: 'Offside',
 };
 // Stats that a broadcast frame cannot show; the UI renders them as "—".
-const MISSING: (keyof TeamStats)[] = ['passAccuracy', 'pressing', 'passingLanes', 'attackZones', 'offsides'];
+const MISSING: (keyof TeamStats)[] = ['passAccuracy', 'pressing', 'passingLanes', 'attackZones'];
 const XG_PER_CHANCE = 0.12;
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+// Letters of any script, accents folded ("Atlético" = "Atletico"), so Greek or Cyrillic names don't normalise to "".
+const norm = (s: string) => s.normalize('NFD').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 const isHex = (s: string | null): s is string => !!s && /^#[0-9a-f]{6}$/i.test(s);
 
 /** "MCI", "Man City" and "Manchester City" are one team: same first letter, and the short form's letters appear in order in the long one. */
@@ -29,15 +32,16 @@ export function sameTeam(a: string, b: string) {
   return i === short.length;
 }
 
-/** "67:12" -> 68, "45+2" -> 47, "34'" -> 34. Null when unreadable. */
+/** "67:12" -> 68, "45+2" and "45:00 +2" -> 47, "34'" -> 34. Null when unreadable. */
 export function parseClock(clock: string | null): number | null {
   if (!clock) return null;
-  const added = clock.match(/(\d{1,3})\s*\+\s*(\d{1,2})/);
-  if (added) return Number(added[1]) + Number(added[2]);
-  const mmss = clock.match(/(\d{1,3}):(\d{2})/);
-  if (mmss) return Math.max(1, Number(mmss[1]) + (Number(mmss[2]) > 0 ? 1 : 0));
-  const bare = clock.match(/^\s*(\d{1,3})'?\s*$/);
-  return bare ? Number(bare[1]) : null;
+  // The main clock is an mm:ss anywhere ("2H 67:12"), else a bare minute followed by ', + or the end.
+  const main = clock.match(/(\d{1,3}):(\d{2})/) ?? clock.match(/(\d{1,3})(?=\s*'?\s*(?:\+|$))/);
+  if (!main) return null;
+  const inMinute = (min: string, sec?: string) => Number(min) + (sec && Number(sec) > 0 ? 1 : 0);
+  // Added time follows the main clock: "45:00 +2", "45:00 +1:23", "90'+3'".
+  const added = clock.slice(main.index! + main[0].length).match(/^\s*'?\s*\+\s*(\d{1,2})(?::(\d{2}))?/);
+  return added ? Number(main[1]) + inMinute(added[1], added[2]) : Math.max(1, inMinute(main[1], main[2]));
 }
 
 type OnScreen = Partial<Record<'possession' | 'shots' | 'shotsOnTarget' | 'corners' | 'fouls' | 'xg', number>>;
@@ -67,14 +71,19 @@ export class ScreenTracker {
   private scoreSeen = false;
   private pendingScore: string | null = null;
 
-  /** Teams are known and a match was recognised recently. */
+  /** Teams are known and a match was recognised within the last 10 minutes. */
   detected(now = Date.now()) {
-    return this.teams !== null && now - this.lastSeen < STALE_MS;
+    return this.teams !== null && now - this.lastSeen < IDLE_MS;
   }
 
-  /** No frames at all for a while: the scan was closed without pressing stop. */
+  /** Recognised before, but not in the last minute (paused video, ad break, overlay closed). */
+  stale(now = Date.now()) {
+    return now - this.lastSeen >= STALE_MS;
+  }
+
+  /** No frames at all for 10 minutes: the scan was closed without pressing stop. */
   idle(now = Date.now()) {
-    return now - this.lastFrame > STALE_MS;
+    return now - this.lastFrame > IDLE_MS;
   }
 
   apply(r: ScreenRead, now = Date.now()) {
@@ -214,9 +223,15 @@ export class ScreenTracker {
         attackZones: { left: 33, center: 34, right: 33 },
       };
     };
+    // "MCI" stays, "Man City" -> "MC" and "Man United" -> "MU" (not both "MAN"), "Arsenal" -> "ARS".
+    const shortName = (name: string) => {
+      const words = name.trim().split(/\s+/);
+      if (name.length <= 4) return name.toUpperCase();
+      return (words.length > 1 ? words.slice(0, 3).map((w) => w[0]).join('') : name.slice(0, 3)).toUpperCase();
+    };
     const team = (side: Side) => ({
       name: teams[side].name,
-      short: teams[side].name.length <= 4 ? teams[side].name.toUpperCase() : teams[side].name.slice(0, 3).toUpperCase(),
+      short: shortName(teams[side].name),
       formation: '',
       color: teams[side].color ?? (side === 'home' ? '#38bdf8' : '#fb923c'),
       stats: stats(side),
@@ -234,7 +249,8 @@ export class ScreenTracker {
       players: [],
       mode: 'screen',
       estimated: true,
-      missing: MISSING,
+      // Fouls exist only once a stats graphic has shown them; until then "—" beats a made-up 0.
+      missing: this.onScreen.home.fouls === undefined && this.onScreen.away.fouls === undefined ? [...MISSING, 'fouls'] : MISSING,
       screen: { frames: this.frames, caption: this.caption },
     };
   }

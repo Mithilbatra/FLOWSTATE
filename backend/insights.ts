@@ -18,9 +18,11 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
   const diff = m.home.stats.possession - m.away.stats.possession;
   if (Math.abs(diff) >= 10) {
     const s: Side = diff > 0 ? 'home' : 'away';
+    // Only quote pass accuracy when the source measures it (screen and free live data don't).
+    const accuracy = m.missing?.includes('passAccuracy') ? '' : `, ${team(s).stats.passAccuracy}% pass accuracy`;
     add(Math.abs(diff) >= 16 ? 80 : 70, {
       id: 'possession', tone: 'positive', side: s, title: 'Midfield control',
-      text: `${team(s).name} are dominating possession in midfield (${team(s).stats.possession}%, ${team(s).stats.passAccuracy}% pass accuracy).`,
+      text: `${team(s).name} are dominating possession in midfield (${team(s).stats.possession}%${accuracy}).`,
     });
   }
 
@@ -74,7 +76,7 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
 
   // Pressing
   const pd = m.home.stats.pressing - m.away.stats.pressing;
-  if (Math.abs(pd) >= 15) {
+  if (Math.abs(pd) >= 15 && !m.missing?.includes('pressing')) {
     const s: Side = pd > 0 ? 'home' : 'away';
     add(40, { id: 'pressing', tone: 'neutral', side: s, title: 'High press', text: `${team(s).name} are pressing much higher (${team(s).stats.pressing} vs ${team(other(s)).stats.pressing} intensity), forcing the build-up.` });
   }
