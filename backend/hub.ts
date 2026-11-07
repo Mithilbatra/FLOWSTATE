@@ -9,6 +9,8 @@ import { describeRead, ScreenTracker } from './screen';
 import { readFrame, type ScreenRead } from './vision';
 
 const LIVE_POLL_MS = 15_000;
+/** After an API error, keep showing the last live match this long before falling back to demo data. */
+const LIVE_HOLD_MS = 5 * 60_000;
 const FULL_TIME_HOLD_TICKS = 8;
 
 export class BusyError extends Error {}
@@ -26,6 +28,8 @@ export class Hub {
   private provider: FootballDataProvider;
   private latest: Match | null = null;
   private notice: string | undefined;
+  /** The last live match fetched, so an API blip doesn't swap it for the demo match. */
+  private lastLive: { base: BaseMatch; at: number } | null = null;
   private source: DataMode = 'demo';
   private nextLiveAttempt = 0;
   private liveBusy = false;
@@ -140,7 +144,7 @@ export class Hub {
     this.demoTick(advance);
   }
 
-  /** True when a live match was published. */
+  /** True when a live match was published (fresh, or the last one held through an API error). */
   private async pollLive() {
     this.liveBusy = true;
     try {
@@ -149,13 +153,23 @@ export class Hub {
       if (raw) {
         this.notice = undefined;
         this.source = 'live';
-        this.publish(fromFootballData(raw));
+        this.lastLive = { base: fromFootballData(raw), at: Date.now() };
+        this.publish(this.lastLive.base);
         return true;
       }
+      this.lastLive = null;
       this.notice = 'No live matches right now — showing demo data.';
     } catch (err) {
-      this.notice = `Live API unavailable (${(err as Error).message}) — showing demo data.`;
-      console.warn(`[hub] ${this.notice}`);
+      const reason = `Live API unavailable (${(err as Error).message})`;
+      console.warn(`[hub] ${reason}`);
+      // A blip mid-match must not swap the real match (and its flow history) for the demo match.
+      if (this.lastLive && Date.now() - this.lastLive.at < LIVE_HOLD_MS) {
+        this.notice = `${reason} — showing the last live reading, retrying.`;
+        this.source = 'live';
+        this.publish(this.lastLive.base);
+        return true;
+      }
+      this.notice = `${reason} — showing demo data.`;
     } finally {
       this.liveBusy = false;
       // Counted from when the request ends, so slow timeouts can't starve the demo fallback.
