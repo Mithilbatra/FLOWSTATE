@@ -13,10 +13,12 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
   const team = (s: Side) => m[s];
   const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
   const add = (priority: number, insight: Insight) => c.push({ priority, insight });
+  // Free live data has only the score: its possession and xG are guesses made from that score, not observations.
+  const fromScore = m.mode === 'live' && m.estimated;
 
   // Possession
   const diff = m.home.stats.possession - m.away.stats.possession;
-  if (Math.abs(diff) >= 10) {
+  if (Math.abs(diff) >= 10 && !fromScore) {
     const s: Side = diff > 0 ? 'home' : 'away';
     // Only quote pass accuracy when the source measures it (screen and free live data don't).
     const accuracy = m.missing?.includes('passAccuracy') ? '' : `, ${team(s).stats.passAccuracy}% pass accuracy`;
@@ -65,7 +67,7 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
   }
 
   // xG vs scoreline
-  for (const s of ['home', 'away'] as Side[]) {
+  for (const s of fromScore ? [] : (['home', 'away'] as Side[])) {
     const gap = team(s).stats.xg - m.score[s];
     if (m.minute >= 20 && gap >= 0.9) {
       add(60, { id: `xg-${s}`, tone: 'warning', side: s, title: 'Wasteful in front of goal', text: `${team(s).name} have ${team(s).stats.xg.toFixed(1)} xG but only ${m.score[s]} goal${m.score[s] === 1 ? '' : 's'} — the finishing is not matching the chances.` });
@@ -100,7 +102,9 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
   }
 
   if (c.length === 0) {
-    add(10, { id: 'balanced', tone: 'neutral', title: 'Evenly balanced', text: 'Neither side has taken control yet; the stats are close across the board.' });
+    add(10, fromScore
+      ? { id: 'score-only', tone: 'neutral', title: 'Score-only data', text: 'This feed has the score and key events but no detailed stats, so there is no deeper read yet.' }
+      : { id: 'balanced', tone: 'neutral', title: 'Evenly balanced', text: 'Neither side has taken control yet; the stats are close across the board.' });
   }
 
   const top = c.sort((a, b) => b.priority - a.priority).slice(0, 4).map((x) => x.insight);
