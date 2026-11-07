@@ -22,6 +22,31 @@ describe('Hub live mode', () => {
     expect(hub.current()?.mode).toBe('live');
   });
 
+  it('keeps the real match through an API error, then falls back after 5 minutes (audit #1)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let fail = false;
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => (fail ? json({ message: 'down' }, 403) : url.includes('status=') ? json({ matches: [fixture] }) : json(fixture))));
+      const hub = new Hub({ ...loadConfig({}), mode: 'live', apiKey: 'k' });
+      await hub.refresh();
+      const live = hub.current()!;
+      fail = true;
+      vi.setSystemTime(Date.now() + 20_000); // past the provider's 10 s cache
+      await hub.refresh();
+      const held = hub.current()!;
+      expect(held.mode).toBe('live');
+      expect(held.home.name).toBe(live.home.name);
+      expect(held.notice).toMatch(/last live reading, retrying/);
+      expect(held.momentum).toEqual(live.momentum); // flow history kept, not reset by a demo match
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      await hub.refresh();
+      expect(hub.current()!.mode).toBe('demo');
+      expect(hub.current()!.notice).toMatch(/showing demo data/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the demo fallback moving while the API is down, without re-polling every update', async () => {
     const fetchMock = vi.fn(async () => json({ message: 'bad token' }, 403));
     vi.stubGlobal('fetch', fetchMock);
