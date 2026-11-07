@@ -155,7 +155,7 @@ Key decisions:
 
 ## What is real, what is estimated
 
-- **football-data.org free tier** provides fixtures, scores and (on some competitions or plans) goals, bookings and substitutions. It has no possession, shots, xG, formations or player stats. Possession, shots and xG are **derived estimates** from the score, badged **Estimated stats**. Fouls, corners, offsides, pass accuracy, pressing and attack lanes would only be guesses from the minute, so they show as "—".
+- **football-data.org free tier** provides fixtures, scores and (on some competitions or plans) goals, bookings and substitutions. It has no possession, shots, xG, formations or player stats. Possession, shots and xG are **derived estimates** from the score, badged **Estimated stats**. Fouls, corners, offsides, pass accuracy, pressing and attack lanes would only be guesses from the minute, so they show as "—". The analyst makes no possession or xG claims from these estimates.
 - **Screen scan**: the score, clock and teams are what the broadcast shows. Possession and pressure are sampled from frames. xG is roughly 0.12 per detected chance unless the broadcast shows real xG. Unmeasurable stats show "—".
 - **Demo**: the simulator produces plausible values for everything, including tracking-style stats (pressing, passing lanes), so the full product can be demonstrated.
 - **The analyst** is a deterministic rule engine (`backend/insights.ts`). It works offline, is testable and never invents facts. In screen mode, Claude adds one caption card describing the current frame.

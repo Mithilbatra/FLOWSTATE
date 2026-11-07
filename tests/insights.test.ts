@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildInsights } from '../backend/insights';
+import { fromFootballData } from '../backend/normalize';
 import type { MomentumPoint } from '../src/types/match';
 import { makeMatch } from './helpers';
 
@@ -37,6 +39,19 @@ describe('buildInsights', () => {
     const screenLike = buildInsights({ ...s, missing: ['passAccuracy', 'pressing'] }).insights;
     expect(screenLike.find((x) => x.id === 'possession')?.text).not.toMatch(/pass accuracy/);
     expect(screenLike.some((x) => x.id === 'pressing')).toBe(false);
+  });
+
+  it('makes no possession or xG claims from score-derived live data (audit #2)', () => {
+    const fixture = JSON.parse(readFileSync('data/fixtures/football-data-sample.json', 'utf8'));
+    const live = fromFootballData({ ...fixture, score: { fullTime: { home: 3, away: 0 } }, goals: [], bookings: [], substitutions: [] });
+    const { insights, summary } = buildInsights({ ...live, momentum: [] });
+    expect(insights.map((i) => i.id)).toEqual(['score-only']);
+    expect(summary).not.toMatch(/possession|xG|balanced/i);
+  });
+
+  it('still reads possession in screen mode, where it is sampled from frames', () => {
+    const screenLike = { ...withStats({ ...quiet, possession: 64 }, { ...quiet, possession: 36 }), mode: 'screen' as const, estimated: true };
+    expect(buildInsights(screenLike).insights.some((i) => i.id === 'possession')).toBe(true);
   });
 
   it('flags the most dangerous attacking channel', () => {
