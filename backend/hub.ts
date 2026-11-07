@@ -105,15 +105,19 @@ export class Hub {
     if (this.screenBusy) throw new BusyError('Still reading the previous frame');
     this.screenBusy = true;
     const epoch = this.scanEpoch;
+    let read: ScreenRead;
     try {
-      const read = await this.read(jpegBase64, this.cfg.screenModel);
-      if (epoch !== this.scanEpoch) return { read: 'Scan stopped', football: true };
-      (this.screen ??= new ScreenTracker()).apply(read);
-      await this.tick(false);
-      return { read: describeRead(read), football: read.football_visible };
+      read = await this.read(jpegBase64, this.cfg.screenModel);
     } finally {
+      // The lock covers only the vision-model read, the expensive part that must run one at a time.
       this.screenBusy = false;
     }
+    if (epoch !== this.scanEpoch) return { read: 'Scan stopped', football: true };
+    (this.screen ??= new ScreenTracker()).apply(read);
+    // Not awaited: a slow live poll must not delay the overlay's answer. Screen and demo updates still
+    // publish before this returns, because tick() only awaits when it polls the live API.
+    this.tick(false).catch((err) => console.error('[hub] update failed', err));
+    return { read: describeRead(read), football: read.football_visible };
   }
 
   stopScreen() {
