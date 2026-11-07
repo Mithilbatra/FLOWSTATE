@@ -150,6 +150,17 @@ describe('Hub screen mode', () => {
     await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false });
   });
 
+  it('answers without waiting for a slow live poll, and accepts the next frame (audit #5)', async () => {
+    let finishPoll = () => {};
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (finishPoll = () => resolve(json({ matches: [] }))))));
+    const hub = new Hub({ ...loadConfig({}), mode: 'live', apiKey: 'k' }, async () => read({ football_visible: false }));
+    const started = Date.now();
+    await hub.ingestFrame('AAAA'); // the live poll it triggered is still pending
+    expect(Date.now() - started).toBeLessThan(1000);
+    await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false }); // not "Still reading"
+    finishPoll();
+  });
+
   it('reads one frame at a time', async () => {
     let release!: () => void;
     const hub = new Hub(loadConfig({}), () => new Promise((resolve) => (release = () => resolve(read()))));
