@@ -12,6 +12,10 @@ const LIVE_POLL_MS = 15_000;
 /** After an API error, keep showing the last live match this long before falling back to demo data. */
 const LIVE_HOLD_MS = 5 * 60_000;
 const FULL_TIME_HOLD_TICKS = 8;
+/** A second overlay may take over a scan only after the first has sent nothing for this long. */
+const SCAN_OWNER_IDLE_MS = 30_000;
+/** An overlay sends at most one frame per 10 s; anything much faster is a bug or a script spending quota. */
+const MIN_FRAME_GAP_MS = 3_000;
 
 export class BusyError extends Error {}
 
@@ -39,6 +43,8 @@ export class Hub {
   private screenBusy = false;
   /** Bumped by stopScreen, so a frame that was still being read when the user pressed stop is dropped. */
   private scanEpoch = 0;
+  /** The scan (one overlay window) whose frames are read, and when it last sent one. */
+  private scanOwner: { id: string; at: number } | null = null;
 
   constructor(
     private cfg: Config,
@@ -101,8 +107,14 @@ export class Hub {
    * Analyse one frame of the user's screen. One frame at a time: concurrent calls get BusyError.
    * `football` tells the overlay whether a match was visible, so it can stop a scan nobody is watching.
    */
-  async ingestFrame(jpegBase64: string) {
+  async ingestFrame(jpegBase64: string, scanId = '') {
     if (this.screenBusy) throw new BusyError('Still reading the previous frame');
+    const now = Date.now();
+    const owner = this.scanOwner;
+    // One scan at a time: a second window would double the cost and mix two videos into one match.
+    if (owner && owner.id !== scanId && now - owner.at < SCAN_OWNER_IDLE_MS) throw new BusyError('Another window is already scanning');
+    if (owner?.id === scanId && now - owner.at < MIN_FRAME_GAP_MS) throw new BusyError('Frames are arriving too fast');
+    this.scanOwner = { id: scanId, at: now };
     this.screenBusy = true;
     const epoch = this.scanEpoch;
     let read: ScreenRead;
@@ -120,10 +132,13 @@ export class Hub {
     return { read: describeRead(read), football: read.football_visible };
   }
 
-  stopScreen() {
+  /** Ends the scan. With a scan id, only that scan's window can end it (another overlay closing must not). */
+  async stopScreen(scanId?: string) {
+    if (scanId !== undefined && this.scanOwner && scanId !== this.scanOwner.id) return;
+    this.scanOwner = null;
     this.scanEpoch++;
     this.screen = null;
-    return this.tick(false);
+    await this.tick(false);
   }
 
   private async tick(advance: boolean) {

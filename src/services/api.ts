@@ -24,9 +24,12 @@ export const refreshMatch = () => request<Match>('/api/refresh', { method: 'POST
 
 export const saveConfig = (config: { mode: Exclude<DataMode, 'screen'>; apiKey?: string }) => postJson<unknown>('/api/config', config);
 
-/** Send one JPEG frame (base64, no data: prefix); resolves with a one-line description and whether football was visible. */
-export const sendFrame = (image: string) => postJson<{ read: string; football: boolean }>('/api/screen/frame', { image });
+/** Send one JPEG frame (base64, no data: prefix) for scan `scanId`; resolves with a one-line description and whether football was visible. */
+export const sendFrame = (image: string, scanId: string) => postJson<{ read: string; football: boolean }>('/api/screen/frame', { image, scanId });
 
 export const getHealth = () => request<{ requestedMode: 'demo' | 'live'; hasKey: boolean }>('/api/health');
 
-export const stopScreen = () => postJson<unknown>('/api/screen/stop', {});
+/** The stop URL for a scan; also used as a beacon when the overlay window closes. */
+export const stopUrl = (scanId?: string) => `/api/screen/stop${scanId ? `?scan=${encodeURIComponent(scanId)}` : ''}`;
+
+export const stopScreen = (scanId?: string) => postJson<unknown>(stopUrl(scanId), {});

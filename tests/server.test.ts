@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { createServer } from '../backend/app';
 import { loadConfig } from '../backend/config';
@@ -20,6 +20,8 @@ beforeAll(async () => {
   await hub.refresh();
 });
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+// Each test is its own scan, as if a new overlay started it.
+afterEach(() => hub.stopScreen());
 
 function call(method: string, path: string, opts: { headers?: Record<string, string>; body?: string } = {}) {
   return new Promise<{ status: number; type: string; body: string }>((resolve, reject) => {
@@ -90,6 +92,30 @@ describe('POST /api/screen/frame', () => {
     const res = await postJson('/api/screen/frame', { image: 'AAAA' });
     expect(res.status).toBe(502);
     expect(JSON.parse(res.body).error).toBe('Frame not analysed: Your credit balance is too low');
+  });
+});
+
+describe('one scan at a time (audit #9)', () => {
+  it('rejects a malformed scan id', async () => {
+    expect((await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'not a valid id!' })).status).toBe(400);
+  });
+
+  it('lets only the window running the scan stop it', async () => {
+    reader = async () => ({ football_visible: false }) as ScreenRead;
+    expect((await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-a' })).status).toBe(200);
+    expect(hub.current()!.notice).toMatch(/Scanning your screen/);
+    expect((await call('POST', '/api/screen/stop?scan=window-b')).status).toBe(200);
+    expect(hub.current()!.notice).toMatch(/Scanning your screen/); // still scanning
+    expect((await call('POST', '/api/screen/stop?scan=window-a')).status).toBe(200);
+    expect(hub.current()!.notice ?? '').not.toMatch(/Scanning your screen/);
+  });
+
+  it('tells a second window that another one is scanning', async () => {
+    reader = async () => ({ football_visible: false }) as ScreenRead;
+    expect((await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-a' })).status).toBe(200);
+    const res = await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-b' });
+    expect(res.status).toBe(429);
+    expect(JSON.parse(res.body).error).toBe('Another window is already scanning');
   });
 });
 
