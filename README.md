@@ -186,6 +186,8 @@ tests/          Vitest: normalizers, simulator, momentum, insights, retry/cache,
 npm test
 ```
 
+GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, the typecheck, the tests and the build on Node 20 and 22 for every pull request and every push to `main`.
+
 Covers:
 
 - the football-data and simulator normalizers;
