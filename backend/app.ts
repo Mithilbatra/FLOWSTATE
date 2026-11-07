@@ -21,12 +21,15 @@ export function createServer(hub: Hub, dist?: string) {
 
   // Screen frames are ~200 KB JPEGs, so this route gets its own body limit (registered before the 4 KB default).
   app.post('/api/screen/frame', express.json({ limit: '4mb' }), async (req, res) => {
-    const image = req.body?.image;
+    const { image, scanId } = req.body ?? {};
     if (typeof image !== 'string' || image.length > 4_000_000 || !/^[A-Za-z0-9+/]+=*$/.test(image)) {
       return res.status(400).json({ error: 'image must be a base64 JPEG' });
     }
+    if (scanId !== undefined && (typeof scanId !== 'string' || !/^[\w-]{1,64}$/.test(scanId))) {
+      return res.status(400).json({ error: 'scanId looks invalid' });
+    }
     try {
-      res.json(await hub.ingestFrame(image));
+      res.json(await hub.ingestFrame(image, scanId));
     } catch (err) {
       if (err instanceof BusyError) return res.status(429).json({ error: err.message });
       if (err instanceof VisionUnavailableError) return res.status(503).json({ error: err.message });
@@ -40,8 +43,9 @@ export function createServer(hub: Hub, dist?: string) {
 
   app.use(express.json({ limit: '4kb' }));
 
-  app.post('/api/screen/stop', async (_req, res) => {
-    await hub.stopScreen();
+  app.post('/api/screen/stop', async (req, res) => {
+    // ?scan=<id>: only the window running the scan may stop it (also sent as a beacon when its window closes).
+    await hub.stopScreen(typeof req.query.scan === 'string' ? req.query.scan : undefined);
     res.json({ ok: true });
   });
 

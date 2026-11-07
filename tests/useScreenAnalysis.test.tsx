@@ -95,7 +95,21 @@ describe('useScreenAnalysis', () => {
     const { result } = renderHook(() => useScreenAnalysis());
     await act(() => result.current.start());
     window.dispatchEvent(new Event('pagehide'));
-    expect(beacon).toHaveBeenCalledWith('/api/screen/stop');
+    expect(beacon).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/screen\/stop\?scan=[\w-]+$/));
+  });
+
+  it('sends one scan id with every frame and with the stop (audit #9)', async () => {
+    api.sendFrame.mockResolvedValue({ read: 'MCI 1–0 ARS', football: true });
+    const { result } = renderHook(() => useScreenAnalysis());
+    await act(() => result.current.start());
+    changePicture(99);
+    await nextFrame();
+    act(() => result.current.stop());
+    const ids = api.sendFrame.mock.calls.map((call) => call[1]);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toMatch(/^[\w-]{1,64}$/);
+    expect(api.stopScreen).toHaveBeenCalledWith(ids[0]);
   });
 
   it('stays stopped when a frame answers after Stop was pressed', async () => {

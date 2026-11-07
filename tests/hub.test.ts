@@ -132,6 +132,7 @@ describe('Hub screen mode', () => {
     try {
       const hub = new Hub(loadConfig({}), async () => read());
       await hub.ingestFrame('AAAA');
+      vi.setSystemTime(Date.now() + 10_000); // the overlay's next frame comes 10 s later
       await hub.ingestFrame('AAAA');
       vi.setSystemTime(Date.now() + 61_000); // paused: unchanged frames are not sent
       await tick(hub);
@@ -151,14 +152,50 @@ describe('Hub screen mode', () => {
   });
 
   it('answers without waiting for a slow live poll, and accepts the next frame (audit #5)', async () => {
-    let finishPoll = () => {};
-    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (finishPoll = () => resolve(json({ matches: [] }))))));
-    const hub = new Hub({ ...loadConfig({}), mode: 'live', apiKey: 'k' }, async () => read({ football_visible: false }));
-    const started = Date.now();
-    await hub.ingestFrame('AAAA'); // the live poll it triggered is still pending
-    expect(Date.now() - started).toBeLessThan(1000);
-    await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false }); // not "Still reading"
-    finishPoll();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let finishPoll = () => {};
+      vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (finishPoll = () => resolve(json({ matches: [] }))))));
+      const hub = new Hub({ ...loadConfig({}), mode: 'live', apiKey: 'k' }, async () => read({ football_visible: false }));
+      const started = performance.now();
+      await hub.ingestFrame('AAAA'); // the live poll it triggered is still pending
+      expect(performance.now() - started).toBeLessThan(1000);
+      vi.setSystemTime(Date.now() + 10_000); // the overlay's next frame comes 10 s later
+      await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false }); // not "Still reading"
+      finishPoll();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads frames from one window at a time; another can take over after 30 s quiet (audit #9)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const hub = new Hub(loadConfig({}), async () => read());
+      await hub.ingestFrame('AAAA', 'window-a');
+      await expect(hub.ingestFrame('AAAA', 'window-b')).rejects.toThrow('Another window is already scanning');
+      await hub.stopScreen('window-b'); // window B closing must not end A's scan
+      expect(hub.current()!.mode).toBe('screen');
+      vi.setSystemTime(Date.now() + 31_000); // A has gone quiet
+      await expect(hub.ingestFrame('AAAA', 'window-b')).resolves.toMatchObject({ football: true });
+      await hub.stopScreen('window-b');
+      expect(hub.current()!.mode).toBe('demo');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses frames from one scan less than 3 s apart (audit #9)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const hub = new Hub(loadConfig({}), async () => read());
+      await hub.ingestFrame('AAAA', 'window-a');
+      await expect(hub.ingestFrame('AAAA', 'window-a')).rejects.toThrow('Frames are arriving too fast');
+      vi.setSystemTime(Date.now() + 3_000);
+      await expect(hub.ingestFrame('AAAA', 'window-a')).resolves.toMatchObject({ football: true });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reads one frame at a time', async () => {

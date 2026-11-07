@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, sendFrame, stopScreen } from '../services/api';
+import { ApiError, sendFrame, stopScreen, stopUrl } from '../services/api';
 
 interface ScanState {
   status: 'idle' | 'starting' | 'scanning' | 'error';
@@ -31,12 +31,14 @@ function thumbnailDiff(a: Uint8ClampedArray, b: Uint8ClampedArray) {
 export function useScreenAnalysis() {
   const [state, setState] = useState<ScanState>({ status: 'idle', frames: 0 });
   const cleanupRef = useRef<(() => void) | undefined>(undefined);
+  // Identifies this window's scan to the server, which reads frames from one scan at a time.
+  const scanIdRef = useRef('');
 
   const stop = useCallback((error?: string) => {
     cleanupRef.current?.();
     cleanupRef.current = undefined;
     setState((s) => ({ ...s, status: error ? 'error' : 'idle', error }));
-    void stopScreen().catch(() => {});
+    void stopScreen(scanIdRef.current).catch(() => {});
   }, []);
 
   const start = useCallback(async () => {
@@ -48,6 +50,8 @@ export function useScreenAnalysis() {
       setState({ status: 'error', frames: 0, error: 'Screen sharing was cancelled or is blocked.' });
       return;
     }
+    const scanId = crypto.randomUUID();
+    scanIdRef.current = scanId;
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
@@ -64,7 +68,7 @@ export function useScreenAnalysis() {
     let emptyFrames = 0;
     let seenFootball = false;
     // Closing the overlay window kills the capture; tell the server now rather than leaving the last reading up.
-    const onLeave = () => navigator.sendBeacon('/api/screen/stop');
+    const onLeave = () => navigator.sendBeacon(stopUrl(scanId));
     window.addEventListener('pagehide', onLeave);
 
     cleanupRef.current = () => {
@@ -92,7 +96,7 @@ export function useScreenAnalysis() {
           frame.getContext('2d')!.drawImage(video, 0, 0, frame.width, frame.height);
           const image = frame.toDataURL('image/jpeg', 0.8).split(',')[1];
           try {
-            const { read, football } = await sendFrame(image);
+            const { read, football } = await sendFrame(image, scanId);
             if (!alive) return; // stopped while this frame was in flight
             seenFootball ||= football;
             emptyFrames = football ? 0 : emptyFrames + 1;
