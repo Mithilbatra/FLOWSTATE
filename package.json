@@ -15,7 +15,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "overlay": "npx --yes electron@45 electron/main.cjs"
+    "overlay": "npx --yes electron@45.0.0 electron/main.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

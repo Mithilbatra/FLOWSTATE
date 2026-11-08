@@ -207,7 +207,7 @@ The Gemini reader is tested against a mocked SDK: request shape, schema validati
 - State is **in memory in one process**: no database and no history across restarts.
 - Screen scanning reads one frame per 10 s, so very quick events (a card shown for 3 s) can be missed. The rest follows from the scoreboard.
 - The live football-data path has run against the real API once (a Série A match), plus a recorded fixture in tests. Screen scanning has read one synthetic frame through Gemini, plus fake readers in tests, but has not been run against a real broadcast.
-- Electron is run via `npx electron@45`, with no installer or packaging. The window chooser for systems without the macOS 15 picker is untested here. Electron 45's download script asks for Node 22.12+; on Node 20 it prints `EBADENGINE` warnings but installs and runs.
+- Electron is run via `npx electron@45.0.0`, pinned so `npm run overlay` never fetches and runs a release nobody has tried; to upgrade, change the version in `package.json`. There is no installer or packaging. The window chooser for systems without the macOS 15 picker is untested here. Electron 45's download script asks for Node 22.12+; on Node 20 it prints `EBADENGINE` warnings but installs and runs.
 - `.npmrc` sets `legacy-peer-deps=true` to avoid an npm peer-resolution crash with the current Vite/Vitest versions. The peers that matter (`react-is`, `@testing-library/dom`) are installed explicitly.
 - The display fonts load from Google Fonts. Offline, it falls back to system fonts.
 
