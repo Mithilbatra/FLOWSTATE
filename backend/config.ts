@@ -24,6 +24,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     simSpeed: Math.max(0.1, num(env.SIM_SPEED, 1)),
     simSeed: num(env.SIM_SEED, 42),
     simStartMinute: Math.max(0, Math.min(89, num(env.SIM_START_MINUTE, 24))),
-    screenModel: env.SCREEN_MODEL || 'claude-opus-5-5',
+    // Left empty with only a Gemini key set, read with Gemini: that setup has no key for the default model.
+    screenModel: env.SCREEN_MODEL || (env.GEMINI_API_KEY && !env.ANTHROPIC_API_KEY ? 'gemini-3.8-flash' : 'claude-opus-5-5'),
   };
 }

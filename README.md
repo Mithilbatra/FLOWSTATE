@@ -65,8 +65,8 @@ Other scripts: `npm test`, `npm run typecheck`.
 ## Scan my screen (Claude or Gemini vision)
 
 1. Pick a reader in `.env`, then restart `npm run dev`. The model name decides which provider is called:
-   - **Claude:** `SCREEN_MODEL=claude-opus-5-5` (the default) or `claude-haiku-5-5`, plus `ANTHROPIC_API_KEY=...` (or run `ant auth login`). Needs API credits.
-   - **Gemini:** `SCREEN_MODEL=gemini-3.8-flash` plus `GEMINI_API_KEY=...` from <https://aistudio.google.com/apikey>. Works on the free tier.
+   - **Claude:** `ANTHROPIC_API_KEY=...` (or run `ant auth login`), with `SCREEN_MODEL` left empty for `claude-opus-5-5` or set to `claude-haiku-5-5`. Needs API credits.
+   - **Gemini:** `GEMINI_API_KEY=...` from <https://aistudio.google.com/apikey>. With only this key set, `SCREEN_MODEL` can stay empty and `gemini-3.8-flash` is used. Works on the free tier.
 2. Open the overlay: **Scan my screen** in the dashboard opens a pop-out, or use `npm run overlay` for the always-on-top window.
 3. In the overlay, press **Scan my screen** and choose the tab or window with the match.
    - In a browser, the browser's own picker opens.
@@ -106,7 +106,7 @@ Copy `.env.example` to `.env` (the backend loads it automatically).
 | `DATA_MODE` | `demo` | `demo` = simulator, `live` = football-data.org with automatic fallback to demo. Also switchable from the in-app settings screen. |
 | `FOOTBALL_DATA_API_KEY` | _(empty)_ | Free token from <https://www.football-data.org/client/register>. |
 | `FOOTBALL_DATA_MATCH_ID` | _(empty)_ | Pin a specific match id. Otherwise the first in-play match is used. |
-| `SCREEN_MODEL` | `claude-opus-5-5` | Model that reads screen frames. A `claude-*` name uses Claude; a `gemini-*` name (e.g. `gemini-3.8-flash`) uses Gemini. |
+| `SCREEN_MODEL` | _(empty)_ | Model that reads screen frames. A `claude-*` name uses Claude; a `gemini-*` name (e.g. `gemini-3.8-flash`) uses Gemini. Empty means `gemini-3.8-flash` when `GEMINI_API_KEY` is set and `ANTHROPIC_API_KEY` is not, otherwise `claude-opus-5-5`. |
 | `ANTHROPIC_API_KEY` | _(empty)_ | For Claude screen scanning. An `ant auth login` profile also works. |
 | `GEMINI_API_KEY` | _(empty)_ | For Gemini screen scanning. Free from <https://aistudio.google.com/apikey>. |
 | `SIM_SPEED` | `1` | Simulator speed. `1` = one match minute every 2 seconds (a full match in ~3.5 min). |
