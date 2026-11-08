@@ -37,9 +37,10 @@ export function Controls({ settings, update, link, onRefresh }: Props) {
       <div className="brand">
         <img className="logo" src="/flowstate.svg" alt="" /> Flowstate <em>Ego mode</em>
       </div>
-      <div className="tabs" role="tablist" aria-label="Views">
+      {/* Plain buttons, not role="tab": tab roles promise arrow-key navigation that these do not have. */}
+      <div className="tabs" role="group" aria-label="Views">
         {VIEWS.map((v) => (
-          <button key={v.id} role="tab" aria-selected={settings.view === v.id} className="tab" title={v.title} onClick={() => update({ view: v.id })}>
+          <button key={v.id} aria-current={settings.view === v.id ? 'true' : undefined} className="tab" title={v.title} onClick={() => update({ view: v.id })}>
             {v.label}
           </button>
         ))}
