@@ -7,8 +7,10 @@ import { InsightPanel } from '../src/components/InsightPanel';
 import { formationRows } from '../src/components/FormationPitch';
 import { GoalBurst } from '../src/components/GoalBurst';
 import { MatchHeader } from '../src/components/MatchHeader';
+import { MomentumPanel } from '../src/components/MomentumPanel';
 import { Onboarding } from '../src/components/Onboarding';
 import { StatsPanel } from '../src/components/StatsPanel';
+import { inFlow } from '../src/utils/format';
 import { topPlayers } from '../src/utils/players';
 import { makeMatch } from './helpers';
 
@@ -142,5 +144,22 @@ describe('Controls (audit #6)', () => {
     expect(views.map((b) => b.getAttribute('aria-current'))).toEqual([null, 'true', null]);
     fireEvent.click(views[2]);
     expect(update).toHaveBeenCalledWith({ view: 'players' });
+  });
+});
+
+describe('flow (audit #12)', () => {
+  const threat = (home: number[]) => home.map((h, i) => ({ minute: i + 1, home: h, away: 30, net: 0, territory: 50 }));
+
+  it("needs 3 minutes of the side's own threat averaging 50 or more", () => {
+    expect(inFlow(threat([90, 90]), 'home')).toBe(false);
+    expect(inFlow(threat([0, 49, 50, 51]), 'home')).toBe(true);
+    expect(inFlow(threat([0, 49, 50, 50]), 'home')).toBe(false);
+    expect(inFlow(threat([0, 49, 50, 51]), 'away')).toBe(false);
+  });
+
+  it('shows the flow badge only for the side in flow', () => {
+    render(<MomentumPanel match={{ ...match, momentum: threat([10, 50, 50, 50]) }} />);
+    expect(screen.getByText(`⚡ ${match.home.short} entered flow`)).toBeInTheDocument();
+    expect(screen.queryByText(`⚡ ${match.away.short} entered flow`)).toBeNull();
   });
 });
