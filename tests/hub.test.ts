@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../backend/config';
 import { BusyError, Hub } from '../backend/hub';
 import type { ScreenRead } from '../backend/vision';
+import { screenRead } from './helpers';
 
 const fixture = JSON.parse(readFileSync('data/fixtures/football-data-sample.json', 'utf8'));
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -87,14 +88,12 @@ describe('Hub live mode', () => {
 });
 
 describe('Hub screen mode', () => {
-  const read = (over: Partial<ScreenRead> = {}): ScreenRead => ({
-    football_visible: true, is_replay: false, competition: null, home_team: 'BAR', away_team: 'RMA',
-    home_score: 1, away_score: 0, clock: '55:10', period: 'second_half', home_color: null, away_color: null,
-    possession: 'away', attacking_team: 'away', danger: 'final_third', event: 'none', event_team: 'unknown',
-    event_player: null, caption: 'Madrid probing down the right.',
-    stats: { possession_home: null, possession_away: null, shots_home: null, shots_away: null, shots_on_target_home: null, shots_on_target_away: null, corners_home: null, corners_away: null, fouls_home: null, fouls_away: null, xg_home: null, xg_away: null },
-    ...over,
-  });
+  // Barcelona 1-0 Real Madrid early in the second half, Madrid attacking.
+  const read = (over: Partial<ScreenRead> = {}) =>
+    screenRead({
+      home_team: 'BAR', away_team: 'RMA', home_score: 1, clock: '55:10', period: 'second_half',
+      possession: 'away', attacking_team: 'away', danger: 'final_third', caption: 'Madrid probing down the right.', ...over,
+    });
 
   it('publishes what was read from the screen, then returns to demo when stopped', async () => {
     const hub = new Hub(loadConfig({}), async () => read());

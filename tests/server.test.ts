@@ -7,6 +7,7 @@ import { createServer } from '../backend/app';
 import { loadConfig } from '../backend/config';
 import { Hub } from '../backend/hub';
 import { VisionUnavailableError, type ScreenRead } from '../backend/vision';
+import { screenRead } from './helpers';
 
 // Each test sets how the next frame read behaves.
 let reader: () => Promise<ScreenRead> = () => Promise.reject(new Error('no reader set'));
@@ -71,7 +72,7 @@ describe('POST /api/screen/frame', () => {
 
   it('answers 429 while the previous frame is still being read', async () => {
     let release!: () => void;
-    reader = () => new Promise((resolve) => (release = () => resolve({ football_visible: false } as ScreenRead)));
+    reader = () => new Promise((resolve) => (release = () => resolve(screenRead({ football_visible: false }))));
     const first = postJson('/api/screen/frame', { image: 'AAAA' });
     await new Promise((r) => setTimeout(r, 50));
     expect((await postJson('/api/screen/frame', { image: 'AAAA' })).status).toBe(429);
@@ -101,7 +102,7 @@ describe('one scan at a time (audit #9)', () => {
   });
 
   it('lets only the window running the scan stop it', async () => {
-    reader = async () => ({ football_visible: false }) as ScreenRead;
+    reader = async () => screenRead({ football_visible: false });
     expect((await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-a' })).status).toBe(200);
     expect(hub.current()!.notice).toMatch(/Scanning your screen/);
     expect((await call('POST', '/api/screen/stop?scan=window-b')).status).toBe(200);
@@ -111,7 +112,7 @@ describe('one scan at a time (audit #9)', () => {
   });
 
   it('tells a second window that another one is scanning', async () => {
-    reader = async () => ({ football_visible: false }) as ScreenRead;
+    reader = async () => screenRead({ football_visible: false });
     expect((await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-a' })).status).toBe(200);
     const res = await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-b' });
     expect(res.status).toBe(429);

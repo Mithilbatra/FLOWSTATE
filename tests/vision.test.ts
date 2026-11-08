@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { screenRead } from './helpers';
 
 // Stand-in for Google's SDK: records the request and returns whatever the test queues.
 const gemini = vi.hoisted(() => ({ generateContent: vi.fn() }));
@@ -18,13 +19,7 @@ const { ApiError } = await import('@google/genai');
 const { readFrame, VisionUnavailableError } = await import('../backend/vision');
 const { loadConfig } = await import('../backend/config');
 
-const read = {
-  football_visible: true, is_replay: false, competition: null, home_team: 'MCI', away_team: 'ARS',
-  home_score: 1, away_score: 0, clock: '23:41', period: 'first_half', home_color: '#6cabdd', away_color: '#ef4444',
-  possession: 'home', attacking_team: 'home', danger: 'final_third', event: 'none', event_team: 'unknown',
-  event_player: null, caption: 'City camped in the Arsenal half.',
-  stats: { possession_home: null, possession_away: null, shots_home: null, shots_away: null, shots_on_target_home: null, shots_on_target_away: null, corners_home: null, corners_away: null, fouls_home: null, fouls_away: null, xg_home: null, xg_away: null },
-};
+const read = screenRead();
 
 beforeEach(() => vi.stubEnv('GEMINI_API_KEY', 'test-key'));
 afterEach(() => {

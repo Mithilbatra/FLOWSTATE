@@ -1,22 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeRead, parseClock, sameTeam, ScreenTracker } from '../backend/screen';
 import type { ScreenRead } from '../backend/vision';
-
-const noStats = {
-  possession_home: null, possession_away: null, shots_home: null, shots_away: null,
-  shots_on_target_home: null, shots_on_target_away: null, corners_home: null, corners_away: null,
-  fouls_home: null, fouls_away: null, xg_home: null, xg_away: null,
-};
-
-/** A typical live frame: MCI 0-0 ARS at 10:00, home in possession. Override per test. */
-const frame = (over: Partial<ScreenRead> = {}): ScreenRead => ({
-  football_visible: true, is_replay: false, competition: 'Premier League',
-  home_team: 'MCI', away_team: 'ARS', home_score: 0, away_score: 0, clock: '10:00',
-  period: 'first_half', home_color: '#6cabdd', away_color: '#ef4444',
-  possession: 'home', attacking_team: 'none', danger: 'none',
-  event: 'none', event_team: 'unknown', event_player: null, stats: noStats, caption: 'City keep the ball.',
-  ...over,
-});
+import { noStats, screenRead as frame } from './helpers';
 
 describe('parseClock', () => {
   it('reads broadcast clock formats', () => {
