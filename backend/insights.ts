@@ -1,5 +1,5 @@
 import type { Insight, MomentumPoint, Side } from '../src/types/match';
-import { minuteLabel } from '../src/utils/format';
+import { inFlow, minuteLabel } from '../src/utils/format';
 import type { BaseMatch } from './normalize';
 
 type Candidate = { priority: number; insight: Insight };
@@ -60,7 +60,7 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
     }
     // Flow: a side's own threat stays high for three straight minutes.
     for (const side of ['home', 'away'] as Side[]) {
-      if (avg(m.momentum.slice(-3).map((p) => p[side])) >= 50) {
+      if (inFlow(m.momentum, side)) {
         add(78, { id: `flow-${side}`, tone: 'positive', side, title: `${team(side).short} entered FLOW`, text: `${team(side).name} are in the zone: wave after wave of attacks, every touch heading for goal.` });
       }
     }
