@@ -133,7 +133,7 @@ h3 { font: 600 11.5px var(--ui); letter-spacing: 0.16em; text-transform: upperca
   clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
 }
 .tab:hover { color: var(--text); }
-.tab[aria-selected='true'] { background: linear-gradient(90deg, var(--ego), #1747c4); color: #fff; box-shadow: 0 0 18px rgba(31, 99, 255, 0.6); }
+.tab[aria-current='true'] { background: linear-gradient(90deg, var(--ego), #1747c4); color: #fff; box-shadow: 0 0 18px rgba(31, 99, 255, 0.6); }
 .control-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .btn {
   border: 1px solid var(--edge);

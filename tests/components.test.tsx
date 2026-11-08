@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CompactOverlay } from '../src/components/CompactOverlay';
+import { Controls } from '../src/components/Controls';
 import { EventTimeline } from '../src/components/EventTimeline';
 import { InsightPanel } from '../src/components/InsightPanel';
 import { formationRows } from '../src/components/FormationPitch';
@@ -127,5 +128,19 @@ describe('Onboarding (audit #9)', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('Controls (audit #6)', () => {
+  it('marks the current view on plain buttons, with no tab roles it cannot live up to', () => {
+    const update = vi.fn();
+    render(<Controls settings={{ view: 'tactical', compact: false, showAI: true, onboarded: true }} update={update} link="live" onRefresh={async () => {}} />);
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
+    const views = within(screen.getByRole('group', { name: 'Views' })).getAllByRole('button');
+    expect(views.map((b) => b.textContent)).toEqual(['Match', 'Metavision', 'Rankings']);
+    expect(views.map((b) => b.getAttribute('aria-current'))).toEqual([null, 'true', null]);
+    fireEvent.click(views[2]);
+    expect(update).toHaveBeenCalledWith({ view: 'players' });
   });
 });
