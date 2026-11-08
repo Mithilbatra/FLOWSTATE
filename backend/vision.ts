@@ -122,7 +122,7 @@ async function readWithClaude(jpegBase64: string, model: string): Promise<Screen
     }
     // With no key and no `ant auth login` profile the SDK throws a plain Error, not a typed one.
     if (!(err instanceof Anthropic.APIError) && /authentication method/i.test((err as Error).message)) {
-      throw new VisionUnavailableError('No Claude credentials. Set ANTHROPIC_API_KEY in .env and restart the server.');
+      throw new VisionUnavailableError('No Claude credentials. Set ANTHROPIC_API_KEY in .env, or for Gemini set GEMINI_API_KEY and SCREEN_MODEL=gemini-3.8-flash, then restart the server.');
     }
     throw err;
   }
