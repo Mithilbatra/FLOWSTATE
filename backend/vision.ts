@@ -88,6 +88,13 @@ async function readWithGemini(jpegBase64: string, model: string): Promise<Screen
     if (err instanceof GeminiApiError && (err.status === 401 || err.status === 403 || /api key/i.test(err.message))) {
       throw new VisionUnavailableError('Gemini rejected the API key. Check GEMINI_API_KEY.');
     }
+    // The error body names the quota that was hit: a per-minute one clears by itself, the daily one only at midnight Pacific.
+    if (err instanceof GeminiApiError && err.status === 429 && /PerDay/.test(err.message)) {
+      const limit = err.message.match(/"quotaValue"\s*:\s*"(\d+)"/)?.[1];
+      throw new VisionUnavailableError(
+        `Gemini's daily request limit for ${model}${limit ? ` (${limit} requests)` : ''} is used up. It resets at midnight Pacific time; enabling billing on your Gemini project raises it.`,
+      );
+    }
     throw err;
   }
   if (!text) throw new Error('Frame not analysed (empty Gemini response)');

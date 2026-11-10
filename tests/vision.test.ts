@@ -55,6 +55,22 @@ describe('readFrame with a gemini model', () => {
     await expect(readFrame('AAAA', 'gemini-3.8-flash')).rejects.toBeInstanceOf(VisionUnavailableError);
   });
 
+  it('stops scanning once the daily quota is used up, but not for the per-minute limit', async () => {
+    const quotaHit = (quotaId: string) =>
+      new (ApiError as unknown as new (s: number, m: string) => Error)(429, JSON.stringify({
+        error: {
+          code: 429, status: 'RESOURCE_EXHAUSTED', message: 'You exceeded your current quota, please check your plan and billing details.',
+          details: [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId, quotaValue: '20' }] }],
+        },
+      }));
+    gemini.generateContent.mockRejectedValueOnce(quotaHit('GenerateRequestsPerDayPerProjectPerModel-FreeTier'));
+    const daily = await readFrame('AAAA', 'gemini-3.8-flash').catch((e) => e);
+    expect(daily).toBeInstanceOf(VisionUnavailableError);
+    expect(daily.message).toBe("Gemini's daily request limit for gemini-3.8-flash (20 requests) is used up. It resets at midnight Pacific time; enabling billing on your Gemini project raises it.");
+    gemini.generateContent.mockRejectedValueOnce(quotaHit('GenerateRequestsPerMinutePerProjectPerModel-FreeTier'));
+    expect(await readFrame('AAAA', 'gemini-3.8-flash').catch((e) => e)).not.toBeInstanceOf(VisionUnavailableError);
+  });
+
   it('treats other API errors as a one-frame failure', async () => {
     gemini.generateContent.mockRejectedValue(new (ApiError as unknown as new (s: number, m: string) => Error)(429, 'Resource exhausted'));
     const err = await readFrame('AAAA', 'gemini-3.8-flash').catch((e) => e);

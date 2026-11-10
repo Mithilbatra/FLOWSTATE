@@ -66,7 +66,7 @@ Other scripts: `npm test`, `npm run typecheck`.
 
 1. Pick a reader in `.env`, then restart `npm run dev`. The model name decides which provider is called:
    - **Claude:** `ANTHROPIC_API_KEY=...` (or run `ant auth login`), with `SCREEN_MODEL` left empty for `claude-opus-5-5` or set to `claude-haiku-5-5`. Needs API credits.
-   - **Gemini:** `GEMINI_API_KEY=...` from <https://aistudio.google.com/apikey>. With only this key set, `SCREEN_MODEL` can stay empty and `gemini-3.8-flash` is used. Works on the free tier.
+   - **Gemini:** `GEMINI_API_KEY=...` from <https://aistudio.google.com/apikey>. With only this key set, `SCREEN_MODEL` can stay empty and `gemini-3.8-flash` is used. Works on the free tier, within its daily request limit (see Cost control).
 2. Open the overlay: **Scan my screen** in the dashboard opens a pop-out, or use `npm run overlay` for the always-on-top window.
 3. In the overlay, press **Scan my screen** and choose the tab or window with the match.
    - In a browser, the browser's own picker opens.
@@ -94,7 +94,7 @@ How it works:
 
 **Cost (rough):**
 - **Claude:** with the default `claude-opus-5-5`, one frame is roughly $0.015–0.02, so about $10 for a full 95-minute match at one frame per 10 s (less if you pause). `claude-haiku-5-5` is roughly $0.30 per match, at some cost to reading tiny scoreboard text.
-- **Gemini:** the free tier costs nothing but caps requests per minute and per day. A full match is about 570 frames, so check your limits in [AI Studio](https://aistudio.google.com/rate-limit). When the cap is hit, those frames fail and scanning catches up once it resets.
+- **Gemini:** the free tier costs nothing but caps requests per minute and per day. A full match is about 570 frames of play, more with a half-time show, so check your project's limits in [AI Studio](https://aistudio.google.com/rate-limit). When the per-minute cap is hit, those frames fail and scanning catches up a minute later. When the daily cap is hit, scanning stops and the overlay says so; it resets at midnight Pacific time, and enabling billing raises it.
 
 ## Environment variables
 
