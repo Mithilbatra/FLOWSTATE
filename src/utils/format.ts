@@ -1,9 +1,11 @@
 import type { MatchStatus, MomentumPoint, Side } from '../types/match';
 
-export function minuteLabel(minute: number, status: MatchStatus) {
+export function minuteLabel(minute: number, status: MatchStatus, extraTime = false) {
   if (status === 'halftime') return 'HT';
   if (status === 'finished') return 'FT';
-  return minute > 90 ? `90+${minute - 90}'` : `${minute}'`;
+  // Added time follows the end of normal time, or of extra time.
+  const end = extraTime ? 120 : 90;
+  return minute > end ? `${end}+${minute - end}'` : `${minute}'`;
 }
 
 /** Share of `a` in `a + b`, 0-100; 50 when both are zero. */

@@ -11,7 +11,7 @@ import { MatchHeader } from '../src/components/MatchHeader';
 import { MomentumPanel } from '../src/components/MomentumPanel';
 import { Onboarding } from '../src/components/Onboarding';
 import { StatsPanel } from '../src/components/StatsPanel';
-import { inFlow } from '../src/utils/format';
+import { inFlow, minuteLabel } from '../src/utils/format';
 import { topPlayers } from '../src/utils/players';
 import { makeMatch } from './helpers';
 
@@ -181,5 +181,22 @@ describe('CompactOverlay in its floating window', () => {
     fireEvent.click(inPip.getByRole('button', { name: 'Close overlay' }));
     expect(close).toHaveBeenCalledTimes(1);
     frame.remove();
+  });
+});
+
+describe('minute labels in extra time', () => {
+  it('reads minutes past 90 as added time, unless the match is in extra time', () => {
+    expect(minuteLabel(93, 'live')).toBe("90+3'");
+    expect(minuteLabel(106, 'live', true)).toBe("106'");
+    expect(minuteLabel(122, 'live', true)).toBe("120+2'");
+    expect(minuteLabel(106, 'halftime', true)).toBe('HT');
+  });
+
+  it("shows 106', not 90+16', on the dashboard and the overlay", () => {
+    const et = { ...match, status: 'live' as const, minute: 106, extraTime: true };
+    render(<MatchHeader match={et} />);
+    expect(screen.getByLabelText('Match clock')).toHaveTextContent("106'");
+    const { container } = render(<CompactOverlay match={et} showAI={false} />);
+    expect(container.querySelector('.clock')).toHaveTextContent("106'");
   });
 });

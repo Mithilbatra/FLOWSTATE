@@ -58,6 +58,7 @@ export class ScreenTracker {
   private score = { home: 0, away: 0 };
   private minute = 1;
   private status: BaseMatch['status'] = 'live';
+  private extraTime = false;
   private possession = { home: 0, away: 0 };
   private danger = { home: 0, away: 0 };
   private chances = { home: 0, away: 0 };
@@ -116,6 +117,8 @@ export class ScreenTracker {
     if (r.period === 'half_time') this.status = 'halftime';
     else if (r.period === 'full_time') this.status = 'finished';
     else if (r.period !== 'unknown') this.status = 'live';
+    // Marked on the score graphic; it lasts until this match is over (a new match starts the tracker over).
+    if (r.period === 'extra_time') this.extraTime = true;
 
     if (r.home_score !== null && r.away_score !== null) this.readScore(r);
     if (r.possession !== 'unclear') this.possession[r.possession]++;
@@ -253,6 +256,7 @@ export class ScreenTracker {
       competition: this.competition || 'From your screen',
       status: this.status,
       minute: this.minute,
+      extraTime: this.extraTime || undefined,
       score: { ...this.score },
       home: team('home'),
       away: team('away'),

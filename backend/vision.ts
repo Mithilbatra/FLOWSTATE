@@ -45,6 +45,7 @@ Report only what is visible in this frame. Never guess and never use outside kno
 
 - Scoreboard: the score graphic, usually in a top corner. The team shown first (left) is home.
   Copy team names or abbreviations exactly as shown. Copy the clock as shown, e.g. "67:12" or "45+2".
+- period: "extra_time" when the score graphic marks extra time (ET, 1ET, 2ET or "extra time").
 - home_color / away_color: the team colour swatches in the score graphic, as hex like "#6cabdd".
 - possession: the team in control of the ball in this frame, matched by kit colour; "unclear" for close-ups, crowd shots or graphics.
 - attacking_team and danger: which team is going forward, and how dangerous it is right now

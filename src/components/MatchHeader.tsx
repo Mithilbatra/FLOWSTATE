@@ -24,7 +24,7 @@ export function MatchHeader({ match }: { match: Match }) {
         <ModeBadge match={match} />
         <span className="clock" aria-label="Match clock">
           {live && <i className="pulse" aria-hidden />}
-          {minuteLabel(match.minute, match.status)}
+          {minuteLabel(match.minute, match.status, match.extraTime)}
         </span>
       </div>
       <div className="mh-teams">

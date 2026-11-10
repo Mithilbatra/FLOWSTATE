@@ -183,6 +183,7 @@ export function fromFootballData(m: FootballDataMatch, now = Date.now()): BaseMa
     competition: m.competition.name,
     status: m.status === 'PAUSED' ? 'halftime' : m.status === 'FINISHED' ? 'finished' : 'live',
     minute,
+    extraTime: m.score.duration === 'EXTRA_TIME' || m.score.duration === 'PENALTY_SHOOTOUT' || undefined,
     score,
     home: team('home'),
     away: team('away'),

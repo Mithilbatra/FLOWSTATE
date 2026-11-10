@@ -89,6 +89,8 @@ export interface Match {
   status: MatchStatus;
   /** Match minute; can exceed 90 in stoppage time */
   minute: number;
+  /** In extra time, minutes past 90 are played minutes ("106'"), not second-half added time ("90+16'") */
+  extraTime?: boolean;
   score: { home: number; away: number };
   home: Team;
   away: Team;

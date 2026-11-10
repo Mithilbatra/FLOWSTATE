@@ -49,6 +49,12 @@ describe('fromFootballData', () => {
     expect(noMinute.minute).toBe(30);
   });
 
+  it("marks extra time, so minute 106 reads 106' and not 90+16'", () => {
+    expect(fromFootballData({ ...fixture, minute: 106, score: { ...fixture.score, duration: 'EXTRA_TIME' } }).extraTime).toBe(true);
+    expect(fromFootballData({ ...fixture, score: { ...fixture.score, duration: 'REGULAR' } }).extraTime).toBeUndefined();
+    expect(m.extraTime).toBeUndefined();
+  });
+
   it('maps PAUSED to halftime and FINISHED to finished', () => {
     expect(fromFootballData({ ...fixture, status: 'PAUSED' }).status).toBe('halftime');
     expect(fromFootballData({ ...fixture, status: 'FINISHED' }).status).toBe('finished');
