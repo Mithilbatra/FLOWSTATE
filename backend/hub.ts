@@ -133,6 +133,11 @@ export class Hub {
   }
 
   /** Ends the scan. With a scan id, only that scan's window can end it (another overlay closing must not). */
+  /** The scanning window is still open but sends no frames (a paused video): keep its scan. */
+  keepAlive(scanId: string) {
+    if (this.scanOwner?.id === scanId) this.screen?.ping();
+  }
+
   async stopScreen(scanId?: string) {
     if (scanId !== undefined && this.scanOwner && scanId !== this.scanOwner.id) return;
     this.scanOwner = null;

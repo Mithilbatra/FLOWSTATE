@@ -4,7 +4,7 @@ import type { ScreenRead } from './vision';
 
 /** No recognised match for this long (half-time, an ad break, a paused video): say the reading is not current. */
 const STALE_MS = 60_000;
-/** No frames at all for this long ends the scan: the overlay was closed without stopping, or the video stayed paused. */
+/** No frames and no keep-alive from the overlay for this long ends the scan: it was closed or crashed without stopping. */
 const IDLE_MS = 10 * 60_000;
 /** The same card/sub/corner graphic stays on screen across frames; count it once. */
 const EVENT_DEDUPE_MS = 90_000;
@@ -66,6 +66,7 @@ export class ScreenTracker {
   private lastEventAt = new Map<string, number>();
   private lastSeen = 0;
   private lastFrame = 0;
+  private lastPing = 0;
   private clockSeen = false;
   private pendingMinute: number | null = null;
   private scoreSeen = false;
@@ -86,9 +87,14 @@ export class ScreenTracker {
     return now - this.lastFrame >= STALE_MS;
   }
 
-  /** No frames at all for 10 minutes: the scan was closed without pressing stop. */
+  /** The overlay is still open; its picture is unchanged (a paused video), so it sends no frames. */
+  ping(now = Date.now()) {
+    this.lastPing = now;
+  }
+
+  /** No frames and no keep-alive for 10 minutes: the overlay was closed or crashed without pressing stop. */
   idle(now = Date.now()) {
-    return now - this.lastFrame > IDLE_MS;
+    return now - Math.max(this.lastFrame, this.lastPing) > IDLE_MS;
   }
 
   apply(r: ScreenRead, now = Date.now()) {

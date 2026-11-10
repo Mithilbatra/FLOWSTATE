@@ -33,3 +33,6 @@ export const getHealth = () => request<{ requestedMode: 'demo' | 'live'; hasKey:
 export const stopUrl = (scanId?: string) => `/api/screen/stop${scanId ? `?scan=${encodeURIComponent(scanId)}` : ''}`;
 
 export const stopScreen = (scanId?: string) => postJson<unknown>(stopUrl(scanId), {});
+
+/** The scan's window is still open, though its picture is unchanged (a paused video). */
+export const keepAlive = (scanId: string) => postJson<unknown>(`/api/screen/alive?scan=${encodeURIComponent(scanId)}`, {});

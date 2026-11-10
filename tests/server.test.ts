@@ -111,6 +111,12 @@ describe('one scan at a time (audit #9)', () => {
     expect(hub.current()!.notice ?? '').not.toMatch(/Scanning your screen/);
   });
 
+  it('answers a keep-alive, and rejects a malformed scan id', async () => {
+    expect((await call('POST', '/api/screen/alive?scan=not%20valid!')).status).toBe(400);
+    expect((await call('POST', '/api/screen/alive')).status).toBe(400);
+    expect((await call('POST', '/api/screen/alive?scan=window-a')).status).toBe(200);
+  });
+
   it('tells a second window that another one is scanning', async () => {
     reader = async () => screenRead({ football_visible: false });
     expect((await postJson('/api/screen/frame', { image: 'AAAA', scanId: 'window-a' })).status).toBe(200);
