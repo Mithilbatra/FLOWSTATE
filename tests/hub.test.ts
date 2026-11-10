@@ -190,6 +190,35 @@ describe('Hub screen mode', () => {
     }
   });
 
+  it('keeps a paused scan, goals included, while its overlay is open; ends it once the overlay goes quiet', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let next = read();
+      const hub = new Hub(loadConfig({}), async () => next);
+      for (const score of [1, 2, 2]) {
+        next = read({ home_score: score });
+        vi.setSystemTime(Date.now() + 10_000);
+        await hub.ingestFrame('AAAA', 'window-a');
+      }
+      expect(hub.current()!.events.filter((e) => e.type === 'goal')).toHaveLength(1);
+      for (let minute = 1; minute <= 30; minute++) {
+        vi.setSystemTime(Date.now() + 60_000);
+        hub.keepAlive('window-a'); // the overlay, paused, once a minute
+        await tick(hub);
+      }
+      expect(hub.current()).toMatchObject({ mode: 'screen', score: { home: 2, away: 0 }, notice: 'Screen scan paused — showing the last reading.' });
+      expect(hub.current()!.events.filter((e) => e.type === 'goal')).toHaveLength(1);
+      for (let minute = 1; minute <= 11; minute++) {
+        vi.setSystemTime(Date.now() + 60_000);
+        hub.keepAlive('window-b'); // not the scanning window: does not keep it
+        await tick(hub);
+      }
+      expect(hub.current()!.mode).toBe('demo');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('tells the overlay when no football was visible (audit #6)', async () => {
     const hub = new Hub(loadConfig({}), async () => read({ football_visible: false }));
     await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false });

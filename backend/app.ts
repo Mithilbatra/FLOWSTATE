@@ -15,6 +15,9 @@ const isLocal = (req: IncomingMessage) =>
   LOCAL_HOST.test(req.headers.host ?? '') && (!req.headers.origin || LOCAL_ORIGIN.test(req.headers.origin));
 
 /** HTTP + WebSocket server around the hub. Serves the built frontend from `dist` when it exists. */
+/** Scan ids come from crypto.randomUUID() in the overlay. */
+const SCAN_ID = /^[\w-]{1,64}$/;
+
 export function createServer(hub: Hub, dist?: string) {
   const app = express();
   app.use((req, res, next) => (isLocal(req) ? next() : res.status(403).end()));
@@ -25,7 +28,7 @@ export function createServer(hub: Hub, dist?: string) {
     if (typeof image !== 'string' || image.length > 4_000_000 || !/^[A-Za-z0-9+/]+=*$/.test(image)) {
       return res.status(400).json({ error: 'image must be a base64 JPEG' });
     }
-    if (scanId !== undefined && (typeof scanId !== 'string' || !/^[\w-]{1,64}$/.test(scanId))) {
+    if (scanId !== undefined && (typeof scanId !== 'string' || !SCAN_ID.test(scanId))) {
       return res.status(400).json({ error: 'scanId looks invalid' });
     }
     try {
@@ -46,6 +49,14 @@ export function createServer(hub: Hub, dist?: string) {
   app.post('/api/screen/stop', async (req, res) => {
     // ?scan=<id>: only the window running the scan may stop it (also sent as a beacon when its window closes).
     await hub.stopScreen(typeof req.query.scan === 'string' ? req.query.scan : undefined);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/screen/alive', (req, res) => {
+    // ?scan=<id>: the scanning window is still open, but its picture has not changed (a paused video), so it sends no frames.
+    const scan = req.query.scan;
+    if (typeof scan !== 'string' || !SCAN_ID.test(scan)) return res.status(400).json({ error: 'scan looks invalid' });
+    hub.keepAlive(scan);
     res.json({ ok: true });
   });
 

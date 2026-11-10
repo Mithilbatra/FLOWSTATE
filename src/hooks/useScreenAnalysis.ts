@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, sendFrame, stopScreen, stopUrl } from '../services/api';
+import { ApiError, keepAlive, sendFrame, stopScreen, stopUrl } from '../services/api';
 
 interface ScanState {
   status: 'idle' | 'starting' | 'scanning' | 'error';
@@ -12,6 +12,8 @@ const INTERVAL_MS = 10_000;
 const MAX_WIDTH = 1280;
 /** Mean per-channel pixel change (0-255) below which a frame counts as unchanged (paused video). */
 const MIN_CHANGE = 3;
+/** While the picture is unchanged, tell the server this often that the scan is still open (it ends scans silent for 10 minutes). */
+const KEEPALIVE_MS = 60_000;
 /**
  * Frames in a row with no football before a forgotten scan stops itself: about 2 minutes if no match was ever seen,
  * about 20 minutes once one was (half-time studio shows and ad breaks are not football but must not end the scan).
@@ -67,6 +69,7 @@ export function useScreenAnalysis() {
     let alive = true;
     let emptyFrames = 0;
     let seenFootball = false;
+    let lastContact = 0;
     // Closing the overlay window kills the capture; tell the server now rather than leaving the last reading up.
     const onLeave = () => navigator.sendBeacon(stopUrl(scanId));
     window.addEventListener('pagehide', onLeave);
@@ -95,6 +98,7 @@ export function useScreenAnalysis() {
           frame.height = Math.round(video.videoHeight * scale);
           frame.getContext('2d')!.drawImage(video, 0, 0, frame.width, frame.height);
           const image = frame.toDataURL('image/jpeg', 0.8).split(',')[1];
+          lastContact = started;
           try {
             const { read, football } = await sendFrame(image, scanId);
             if (!alive) return; // stopped while this frame was in flight
@@ -110,6 +114,9 @@ export function useScreenAnalysis() {
             if (err instanceof ApiError && err.status === 503) return stop(err.message);
             setState((s) => ({ ...s, error: (err as Error).message }));
           }
+        } else if (started - lastContact >= KEEPALIVE_MS) {
+          lastContact = started;
+          void keepAlive(scanId).catch(() => {});
         }
       }
       // A steady 10 s rhythm: the time spent reading the frame counts toward the wait.

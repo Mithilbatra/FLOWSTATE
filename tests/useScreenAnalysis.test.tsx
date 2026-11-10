@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Keep the real ApiError; replace the network calls.
-const api = vi.hoisted(() => ({ sendFrame: vi.fn(), stopScreen: vi.fn(() => Promise.resolve({})) }));
+const api = vi.hoisted(() => ({ sendFrame: vi.fn(), stopScreen: vi.fn(() => Promise.resolve({})), keepAlive: vi.fn(() => Promise.resolve({})) }));
 vi.mock('../src/services/api', async (original) => ({ ...(await original<object>()), ...api }));
 
 const { ApiError } = await import('../src/services/api');
@@ -31,6 +31,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   api.sendFrame.mockReset();
   api.stopScreen.mockClear();
+  api.keepAlive.mockClear();
   track.stop.mockClear();
 });
 
@@ -50,6 +51,20 @@ describe('useScreenAnalysis', () => {
     expect(api.sendFrame).toHaveBeenCalledTimes(2);
     expect(result.current.status).toBe('scanning');
     expect(result.current.frames).toBe(2);
+  });
+
+  it('tells the server once a minute that a paused scan is still open, without sending frames', async () => {
+    api.sendFrame.mockResolvedValue({ read: 'MCI 1–0 ARS', football: true });
+    const { result } = renderHook(() => useScreenAnalysis());
+    await act(() => result.current.start());
+    for (let i = 0; i < 5; i++) await nextFrame(); // 50 s of the same picture
+    expect(api.keepAlive).not.toHaveBeenCalled();
+    await nextFrame(); // a minute since the last frame
+    expect(api.keepAlive).toHaveBeenCalledTimes(1);
+    expect(api.keepAlive).toHaveBeenCalledWith(api.sendFrame.mock.calls[0][1]); // the scan's own id
+    for (let i = 0; i < 6; i++) await nextFrame();
+    expect(api.keepAlive).toHaveBeenCalledTimes(2);
+    expect(api.sendFrame).toHaveBeenCalledTimes(1);
   });
 
   it('stops for good when the key is missing (503)', async () => {
