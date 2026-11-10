@@ -6,7 +6,7 @@ import { ModeBadge } from './ModeBadge';
 interface Props {
   match: Match;
   showAI: boolean;
-  /** Overlay window (?compact=1): draggable, closable, can scan the screen. Otherwise an in-page widget. */
+  /** In its own window (floating, pop-up or Electron): closable, and it can scan the screen. Otherwise an in-page widget. */
   floating?: boolean;
   onExpand?: () => void;
 }
@@ -19,7 +19,8 @@ function ScanBar() {
     <div className="scan">
       <button
         className={`btn btn-scan ${on ? 'on' : ''}`}
-        onClick={on ? scan.stop : scan.start}
+        // Share from the window that was clicked: the floating window has its own user activation, and stays visible.
+        onClick={(e) => (on ? scan.stop() : scan.start(e.currentTarget.ownerDocument.defaultView ?? window))}
         title="Frames from the window you share are sent to the vision model's API (Claude or Gemini, set by SCREEN_MODEL) for analysis"
       >
         {on ? '■ Stop scanning' : '📡 Scan my screen'}
@@ -43,7 +44,7 @@ export function CompactOverlay({ match, showAI, floating, onExpand }: Props) {
         </span>
         <span className="cp-btns">
           {onExpand && <button className="icon-btn" onClick={onExpand} aria-label="Expand to dashboard">⤢</button>}
-          {floating && <button className="icon-btn" onClick={() => window.close()} aria-label="Close overlay">✕</button>}
+          {floating && <button className="icon-btn" onClick={(e) => e.currentTarget.ownerDocument.defaultView?.close()} aria-label="Close overlay">✕</button>}
         </span>
       </div>
       <div className="cp-score">

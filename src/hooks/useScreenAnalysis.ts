@@ -29,6 +29,8 @@ function thumbnailDiff(a: Uint8ClampedArray, b: Uint8ClampedArray) {
 /**
  * Shares a window/tab/screen with getDisplayMedia and sends a downscaled JPEG to the backend every
  * 10 s for the vision model to read. Unchanged frames (paused video) are skipped so they cost nothing.
+ * `win` is the window the overlay is in: the capture, its video and canvases, and its timer all live there, so a
+ * floating window keeps scanning while the dashboard tab is in the background.
  */
 export function useScreenAnalysis() {
   const [state, setState] = useState<ScanState>({ status: 'idle', frames: 0 });
@@ -43,41 +45,41 @@ export function useScreenAnalysis() {
     void stopScreen(scanIdRef.current).catch(() => {});
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (win: Window = window) => {
     setState({ status: 'starting', frames: 0 });
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 2 }, audio: false });
+      stream = await win.navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 2 }, audio: false });
     } catch {
       setState({ status: 'error', frames: 0, error: 'Screen sharing was cancelled or is blocked.' });
       return;
     }
     const scanId = crypto.randomUUID();
     scanIdRef.current = scanId;
-    const video = document.createElement('video');
+    const video = win.document.createElement('video');
     video.muted = true;
     video.playsInline = true;
     video.srcObject = stream;
     await video.play().catch(() => {});
 
-    const frame = document.createElement('canvas');
-    const thumb = document.createElement('canvas');
+    const frame = win.document.createElement('canvas');
+    const thumb = win.document.createElement('canvas');
     thumb.width = 32;
     thumb.height = 18;
     let previous: Uint8ClampedArray | null = null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: number | undefined;
     let alive = true;
     let emptyFrames = 0;
     let seenFootball = false;
     let lastContact = 0;
     // Closing the overlay window kills the capture; tell the server now rather than leaving the last reading up.
-    const onLeave = () => navigator.sendBeacon(stopUrl(scanId));
-    window.addEventListener('pagehide', onLeave);
+    const onLeave = () => win.navigator.sendBeacon(stopUrl(scanId));
+    win.addEventListener('pagehide', onLeave);
 
     cleanupRef.current = () => {
       alive = false;
-      clearTimeout(timer);
-      window.removeEventListener('pagehide', onLeave);
+      win.clearTimeout(timer);
+      win.removeEventListener('pagehide', onLeave);
       stream.getTracks().forEach((t) => t.stop());
     };
     // The browser's own "Stop sharing" button ends the track.
@@ -120,7 +122,7 @@ export function useScreenAnalysis() {
         }
       }
       // A steady 10 s rhythm: the time spent reading the frame counts toward the wait.
-      if (alive) timer = setTimeout(tick, Math.max(0, INTERVAL_MS - (Date.now() - started)));
+      if (alive) timer = win.setTimeout(tick, Math.max(0, INTERVAL_MS - (Date.now() - started)));
     };
     setState({ status: 'scanning', frames: 0, lastRead: 'Reading the first frame…' });
     void tick();

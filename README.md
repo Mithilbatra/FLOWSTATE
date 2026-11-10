@@ -11,7 +11,7 @@ New: **Scan my screen**. Watching on YouTube or any other site? Share that tab o
 It ships as:
 
 - a **full dashboard** with three views: **Match** (stats, flow meter, analyst, match log), **Metavision** (head-to-head radar, formations, attack lanes) and **Rankings** (player "weapons" and ego rankings),
-- a **compact overlay**: a small card with score, possession, xG, the latest event and the lead insight. It runs in a pop-out window or a frameless, transparent, **always-on-top Electron window** above your stream, and it is where screen scanning lives.
+- a **compact overlay**: a small card with score, possession, xG, the latest event and the lead insight. In Chrome or Edge it opens as a **floating window that stays on top of your video** (Document Picture-in-Picture); elsewhere it opens as a pop-out, or as an always-on-top Electron window. It is where screen scanning lives.
 
 The look is an anime-inspired "Ego Mode": electric blue on black, speed lines, cut-corner panels, a VS-screen header and a full-screen **GOAL** slash whenever someone scores.
 
@@ -67,11 +67,11 @@ Other scripts: `npm test`, `npm run typecheck`.
 1. Pick a reader in `.env`, then restart `npm run dev`. The model name decides which provider is called:
    - **Claude:** `ANTHROPIC_API_KEY=...` (or run `ant auth login`), with `SCREEN_MODEL` left empty for `claude-opus-5-5` or set to `claude-haiku-5-5`. Needs API credits.
    - **Gemini:** `GEMINI_API_KEY=...` from <https://aistudio.google.com/apikey>. With only this key set, `SCREEN_MODEL` can stay empty and `gemini-3.8-flash` is used. Works on the free tier, within its daily request limit (see Cost control).
-2. Open the overlay: **Scan my screen** in the dashboard opens a pop-out, or use `npm run overlay` for the always-on-top window.
-3. In the overlay, press **Scan my screen** and choose the tab or window with the match.
+2. Open the overlay: press **Scan my screen** in the dashboard. In Chrome or Edge (116+) it opens a small floating window that stays on top of every other window, YouTube included; it is drawn by the dashboard tab, so keep that tab open (it can stay in the background). Other browsers open an ordinary pop-out instead. For an always-on-top window outside the browser, use `npm run overlay` (Electron).
+3. In the overlay, press **Scan my screen** and choose the tab or window with the match. The stats then update in that same window.
    - In a browser, the browser's own picker opens.
    - In Electron on macOS 15+, the macOS picker opens. The first time, macOS asks to allow Screen Recording for Electron. Elsewhere a dialog asks which window to share; nothing is shared without your choice.
-4. The overlay and dashboard switch to the `SCREEN SCAN` source within one or two frames. Press **Stop scanning**, or stop sharing, to go back. So a forgotten scan doesn't keep spending, it stops by itself after about 2 minutes if it never sees football, or about 20 minutes without football once a match was seen (half-time and ad breaks don't end it). Closing the overlay window also stops it.
+4. The overlay and dashboard switch to the `SCREEN SCAN` source within one or two frames. Press **Stop scanning**, or stop sharing, to go back. So a forgotten scan doesn't keep spending, it stops by itself after about 2 minutes if it never sees football, or about 20 minutes without football once a match was seen (half-time and ad breaks don't end it). Closing the overlay window (or the dashboard tab that draws the floating one) also stops it.
 
 How it works:
 

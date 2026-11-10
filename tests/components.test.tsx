@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createPortal } from 'react-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { CompactOverlay } from '../src/components/CompactOverlay';
 import { Controls } from '../src/components/Controls';
@@ -136,7 +137,7 @@ describe('Onboarding (audit #9)', () => {
 describe('Controls (audit #6)', () => {
   it('marks the current view on plain buttons, with no tab roles it cannot live up to', () => {
     const update = vi.fn();
-    render(<Controls settings={{ view: 'tactical', compact: false, showAI: true, onboarded: true }} update={update} link="live" onRefresh={async () => {}} />);
+    render(<Controls settings={{ view: 'tactical', compact: false, showAI: true, onboarded: true }} update={update} link="live" onRefresh={async () => {}} onScanScreen={() => {}} />);
     expect(screen.queryByRole('tablist')).toBeNull();
     expect(screen.queryByRole('tab')).toBeNull();
     const views = within(screen.getByRole('group', { name: 'Views' })).getAllByRole('button');
@@ -161,5 +162,24 @@ describe('flow (audit #12)', () => {
     render(<MomentumPanel match={{ ...match, momentum: threat([10, 50, 50, 50]) }} />);
     expect(screen.getByText(`⚡ ${match.home.short} entered flow`)).toBeInTheDocument();
     expect(screen.queryByText(`⚡ ${match.away.short} entered flow`)).toBeNull();
+  });
+});
+
+describe('CompactOverlay in its floating window', () => {
+  it('shares the screen from the window it is drawn in, and its close button closes that window', async () => {
+    const frame = document.createElement('iframe');
+    document.body.append(frame);
+    const pip = frame.contentWindow!; // stands in for the Picture-in-Picture window
+    const getDisplayMedia = vi.fn().mockRejectedValue(new Error('cancelled'));
+    Object.defineProperty(pip.navigator, 'mediaDevices', { configurable: true, value: { getDisplayMedia } });
+    const close = vi.spyOn(pip, 'close').mockImplementation(() => {});
+    render(createPortal(<CompactOverlay match={match} showAI floating />, pip.document.body));
+    const inPip = within(pip.document.body);
+    fireEvent.click(inPip.getByRole('button', { name: /Scan my screen/ }));
+    await waitFor(() => expect(inPip.getByText('Screen sharing was cancelled or is blocked.')).toBeInTheDocument());
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1); // the floating window's own, where the click happened
+    fireEvent.click(inPip.getByRole('button', { name: 'Close overlay' }));
+    expect(close).toHaveBeenCalledTimes(1);
+    frame.remove();
   });
 });
