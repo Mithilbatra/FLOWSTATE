@@ -75,7 +75,7 @@ Other scripts: `npm test`, `npm run typecheck`.
 
 How it works:
 
-- The browser grabs a frame every 10 s, scales it to 1280 px wide and sends it as a JPEG to the local backend. **Unchanged frames are skipped**, so a paused video costs nothing. While paused or on an ad break the dashboard keeps the last reading (marked *paused*) for up to 10 minutes, then the scan ends.
+- The browser grabs a frame every 10 s, scales it to 1280 px wide and sends it as a JPEG to the local backend. **Unchanged frames are skipped**, so a paused video costs nothing. Through half-time and ad breaks the match stays up, flow history included, for as long as frames keep coming (marked *no match on screen*). A paused video sends no frames: the last reading stays up, marked *paused*, for up to 10 minutes, then the scan ends.
 - The backend sends it to the model with a strict JSON schema. It asks only for what is visible: scoreboard text, the clock, team colour swatches, any on-screen stat graphic, who has the ball, how dangerous the play is, and whether it is a replay.
   - Claude: structured outputs, effort `low`, server-side refusal fallback.
   - Gemini: the same schema as JSON Schema (`responseJsonSchema`).
@@ -195,7 +195,7 @@ Covers:
 - each insight rule, with regressions for momentum direction and red cards;
 - HTTP retry and the cache;
 - the football-data provider: the first match in play or a pinned one, nothing in play, a refused detail page, and the 10 s cache that keeps it inside the free tier's rate limit;
-- the hub: live mode staying live between polls, holding the last live match through an API error, demo data once nothing is in play, the demo fallback moving while the API is down, the screen source, and one frame at a time;
+- the hub: live mode staying live between polls, holding the last live match through an API error, demo data once nothing is in play, the demo fallback moving while the API is down, the screen source, the match kept through half-time, and one frame at a time;
 - the screen tracker: clock parsing, goals from score changes, VAR removal, replays, possession sampling, stat graphics winning, card dedupe, match change;
 - the dashboard's stream: reconnecting after 1 s, doubling up to 10 s, polling every 5 s while the socket is down, and showing offline when both fail;
 - rendering of the header, stats, timeline, insights, compact overlay and GOAL burst.

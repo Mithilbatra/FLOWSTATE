@@ -40,16 +40,19 @@ describe('sameTeam', () => {
 });
 
 describe('ScreenTracker', () => {
-  it('needs a scoreboard before it reports a match; a minute without one is "stale", ten minutes is gone', () => {
+  it('needs a scoreboard before it reports a match, then keeps it, and tells half-time from a paused video', () => {
     const t = new ScreenTracker();
     t.apply(frame({ home_team: null, away_team: null }), 0);
-    expect(t.detected(0)).toBe(false);
+    expect(t.detected()).toBe(false);
     t.apply(frame(), 1000);
-    expect(t.detected(1000)).toBe(true);
+    expect(t.detected()).toBe(true);
     expect(t.stale(1000)).toBe(false);
-    expect(t.detected(1000 + 61_000)).toBe(true);
-    expect(t.stale(1000 + 61_000)).toBe(true);
-    expect(t.detected(1000 + 601_000)).toBe(false);
+    // A 15-minute half-time show: frames keep coming, with no match on them.
+    for (let at = 11_000; at <= 901_000; at += 10_000) t.apply(frame({ football_visible: false }), at);
+    expect(t.detected()).toBe(true);
+    expect([t.stale(901_000), t.paused(901_000)]).toEqual([true, false]);
+    // A paused video: no frames at all.
+    expect(t.paused(961_000)).toBe(true);
   });
 
   it('turns scoreboard changes into goals on the right side, once each', () => {

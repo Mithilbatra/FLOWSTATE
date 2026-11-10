@@ -168,6 +168,28 @@ describe('Hub screen mode', () => {
     }
   });
 
+  it('keeps the match and its flow history through a 15-minute half-time show', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let next = read();
+      const hub = new Hub(loadConfig({}), async () => next);
+      const frame = async (r: ScreenRead) => {
+        next = r;
+        vi.setSystemTime(Date.now() + 10_000);
+        await hub.ingestFrame('AAAA');
+      };
+      for (const clock of ['43:00', '44:00', '45:00', '45:00 +1:00', '45:00 +2:00']) await frame(read({ clock, period: 'first_half' }));
+      const flow = hub.current()!.momentum;
+      for (let i = 0; i < 90; i++) await frame(read({ football_visible: false })); // studio, pundits, adverts
+      expect(hub.current()).toMatchObject({ mode: 'screen', score: { home: 1, away: 0 }, notice: 'No match on screen (half-time or an ad break) — showing the last reading.' });
+      for (const clock of ['45:00', '45:10', '46:00', '47:00']) await frame(read({ clock }));
+      expect(hub.current()!.notice).toBeUndefined();
+      expect(hub.current()!.momentum.slice(0, flow.length)).toEqual(flow); // the first half's flow is kept
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('tells the overlay when no football was visible (audit #6)', async () => {
     const hub = new Hub(loadConfig({}), async () => read({ football_visible: false }));
     await expect(hub.ingestFrame('AAAA')).resolves.toMatchObject({ football: false });

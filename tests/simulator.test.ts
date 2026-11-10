@@ -64,6 +64,15 @@ describe('MomentumTracker', () => {
     expect(tracker.push(fromApiFootball(fresh.snapshot()))).toHaveLength(1);
   });
 
+  it('keeps the series when the clock restarts after added time (45+2, then 45:00)', () => {
+    const sim = new MatchSimulator(9);
+    const tracker = new MomentumTracker();
+    const at = (minute: number) => ({ ...fromApiFootball(sim.snapshot()), minute });
+    for (let minute = 40; minute <= 47; minute++) tracker.push(at(minute));
+    expect(tracker.push(at(46))).toHaveLength(8); // second half kick-off: no new point, nothing lost
+    expect(tracker.push(at(48))).toHaveLength(9);
+  });
+
   it('does not add a point when the minute has not changed (e.g. a repeat poll)', () => {
     const sim = new MatchSimulator(2);
     const tracker = new MomentumTracker();
