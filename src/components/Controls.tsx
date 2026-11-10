@@ -15,16 +15,16 @@ const LINK_LABEL: Record<LinkState, string> = {
   offline: 'Backend offline — retrying',
 };
 
-const openOverlay = () => window.open('/?compact=1', 'flowstate-overlay', 'popup,width=400,height=440');
-
 interface Props {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
   link: LinkState;
   onRefresh: () => Promise<void>;
+  /** Opens the floating overlay, where the screen is shared and the stats are shown. */
+  onScanScreen: () => void;
 }
 
-export function Controls({ settings, update, link, onRefresh }: Props) {
+export function Controls({ settings, update, link, onRefresh, onScanScreen }: Props) {
   const [busy, setBusy] = useState(false);
   const refresh = async () => {
     setBusy(true);
@@ -49,7 +49,7 @@ export function Controls({ settings, update, link, onRefresh }: Props) {
         <span className={`link link-${link}`} role="status">
           <i aria-hidden /> {LINK_LABEL[link]}
         </span>
-        <button className="btn btn-scan" onClick={openOverlay} title="Open the floating overlay; from there it can scan the match you are watching">
+        <button className="btn btn-scan" onClick={onScanScreen} title="Open the floating overlay. It stays on top of your video: share the match from it, and the stats appear there">
           📡 Scan my screen
         </button>
         <button className="btn" aria-pressed={settings.showAI} onClick={() => update({ showAI: !settings.showAI })}>
