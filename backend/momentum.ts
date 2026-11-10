@@ -10,6 +10,8 @@ interface Snapshot {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+/** After added time the clock restarts a few minutes back (45+2 is minute 47, then the second half starts at 45:00): same match. */
+const MAX_CLOCK_STEP_BACK = 15;
 const snap = (m: BaseMatch, side: Side): Snapshot => {
   const s = m[side].stats;
   return { minute: m.minute, xg: s.xg, shots: s.shots, dangerous: s.dangerousAttacks, corners: s.corners };
@@ -27,7 +29,7 @@ export class MomentumTracker {
 
   push(m: BaseMatch): MomentumPoint[] {
     const last = this.prev?.home.minute ?? -1;
-    if (m.id !== this.matchId || m.minute < last) {
+    if (m.id !== this.matchId || m.minute < last - MAX_CLOCK_STEP_BACK) {
       this.matchId = m.id;
       this.prev = null;
       this.ema = { home: 0, away: 0 };

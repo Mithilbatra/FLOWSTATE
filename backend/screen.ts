@@ -2,9 +2,9 @@ import type { EventType, MatchEvent, Side, TeamStats } from '../src/types/match'
 import type { BaseMatch } from './normalize';
 import type { ScreenRead } from './vision';
 
-/** No recognised frame for this long: the video is probably paused or on an ad break, so say so. */
+/** No recognised match for this long (half-time, an ad break, a paused video): say the reading is not current. */
 const STALE_MS = 60_000;
-/** Keep the scan (and keep showing it) this long without frames, so a paused video or ad break loses nothing. */
+/** No frames at all for this long ends the scan: the overlay was closed without stopping, or the video stayed paused. */
 const IDLE_MS = 10 * 60_000;
 /** The same card/sub/corner graphic stays on screen across frames; count it once. */
 const EVENT_DEDUPE_MS = 90_000;
@@ -71,14 +71,19 @@ export class ScreenTracker {
   private scoreSeen = false;
   private pendingScore: string | null = null;
 
-  /** Teams are known and a match was recognised within the last 10 minutes. */
-  detected(now = Date.now()) {
-    return this.teams !== null && now - this.lastSeen < IDLE_MS;
+  /** A match was recognised in this scan. It stays up through half-time and ad breaks while frames keep coming. */
+  detected() {
+    return this.teams !== null;
   }
 
-  /** Recognised before, but not in the last minute (paused video, ad break, overlay closed). */
+  /** Recognised before, but not in the last minute (half-time, an ad break, a paused video). */
   stale(now = Date.now()) {
     return now - this.lastSeen >= STALE_MS;
+  }
+
+  /** No frames at all for a minute: the video is paused (the overlay does not send unchanged frames). */
+  paused(now = Date.now()) {
+    return now - this.lastFrame >= STALE_MS;
   }
 
   /** No frames at all for 10 minutes: the scan was closed without pressing stop. */

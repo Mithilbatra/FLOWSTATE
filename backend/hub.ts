@@ -218,9 +218,10 @@ export class Hub {
     }
     // Live-API notices describe the demo fallback, so they never belong on screen data.
     const notice =
-      base.mode === 'screen'
-        ? this.screen?.stale() ? 'Screen scan paused — showing the last reading.' : undefined
-        : this.screen ? 'Scanning your screen — no football match recognised yet.' : this.notice;
+      base.mode !== 'screen' ? (this.screen ? 'Scanning your screen — no football match recognised yet.' : this.notice)
+      : this.screen?.paused() ? 'Screen scan paused — showing the last reading.'
+      : this.screen?.stale() ? 'No match on screen (half-time or an ad break) — showing the last reading.'
+      : undefined;
     this.latest = { ...base, momentum, insights, summary, notice, updatedAt: Date.now() };
     this.listeners.forEach((fn) => fn(this.latest!));
   }
