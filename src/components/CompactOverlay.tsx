@@ -40,7 +40,7 @@ export function CompactOverlay({ match, showAI, floating, onExpand }: Props) {
         <ModeBadge match={match} />
         <span className="clock">
           {match.status === 'live' && <i className="pulse" aria-hidden />}
-          {minuteLabel(match.minute, match.status)}
+          {minuteLabel(match.minute, match.status, match.extraTime)}
         </span>
         <span className="cp-btns">
           {onExpand && <button className="icon-btn" onClick={onExpand} aria-label="Expand to dashboard">⤢</button>}

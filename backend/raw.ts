@@ -41,7 +41,7 @@ export interface FootballDataMatch {
   competition: { name: string };
   homeTeam: { name: string; shortName?: string; tla?: string };
   awayTeam: { name: string; shortName?: string; tla?: string };
-  score: { fullTime: { home: number | null; away: number | null } };
+  score: { duration?: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT'; fullTime: { home: number | null; away: number | null } };
   goals?: { minute: number; team: { name: string }; scorer?: { name: string } }[];
   bookings?: { minute: number; team: { name: string }; player?: { name: string }; card: string }[];
   substitutions?: { minute: number; team: { name: string }; playerIn?: { name: string }; playerOut?: { name: string } }[];

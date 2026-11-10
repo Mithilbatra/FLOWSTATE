@@ -196,7 +196,7 @@ Covers:
 - HTTP retry and the cache;
 - the football-data provider: the first match in play or a pinned one, nothing in play, a refused detail page, and the 10 s cache that keeps it inside the free tier's rate limit;
 - the hub: live mode staying live between polls, holding the last live match through an API error, demo data once nothing is in play, the demo fallback moving while the API is down, the screen source, the match kept through half-time and long pauses, and one frame at a time;
-- the screen tracker: clock parsing, goals from score changes, VAR removal, replays, possession sampling, stat graphics winning, card dedupe, match change;
+- the screen tracker: clock parsing, extra time, goals from score changes, VAR removal, replays, possession sampling, stat graphics winning, card dedupe, match change;
 - the dashboard's stream: reconnecting after 1 s, doubling up to 10 s, polling every 5 s while the socket is down, and showing offline when both fail;
 - rendering of the header, stats, timeline, insights, compact overlay and GOAL burst.
 

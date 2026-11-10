@@ -54,6 +54,11 @@ describe('buildInsights', () => {
     expect(buildInsights(screenLike).insights.some((i) => i.id === 'possession')).toBe(true);
   });
 
+  it("heads the summary with the extra-time minute (106', not 90+16')", () => {
+    const { summary } = buildInsights({ ...withStats(quiet, quiet), minute: 106, extraTime: true });
+    expect(summary.startsWith("106' ·")).toBe(true);
+  });
+
   it('flags the most dangerous attacking channel', () => {
     const { insights } = buildInsights(withStats(quiet, { ...quiet, dangerousAttacks: 12, attackZones: { left: 60, center: 10, right: 30 } }));
     const i = insights.find((x) => x.id === 'zone');

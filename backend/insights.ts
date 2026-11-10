@@ -108,6 +108,6 @@ export function buildInsights(m: BaseMatch & { momentum: MomentumPoint[] }): { i
   }
 
   const top = c.sort((a, b) => b.priority - a.priority).slice(0, 4).map((x) => x.insight);
-  const head = `${minuteLabel(m.minute, m.status)} · ${m.home.name} ${m.score.home}–${m.score.away} ${m.away.name}.`;
+  const head = `${minuteLabel(m.minute, m.status, m.extraTime)} · ${m.home.name} ${m.score.home}–${m.score.away} ${m.away.name}.`;
   return { insights: top, summary: [head, ...top.slice(0, 2).map((i) => i.text)].join(' ') };
 }

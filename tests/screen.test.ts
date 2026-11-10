@@ -153,6 +153,19 @@ describe('ScreenTracker', () => {
     expect([m.home.short, m.away.short]).toEqual(['MC', 'MU']);
   });
 
+  it('counts minutes past 90 as extra time once the score graphic says so, for the rest of that match', () => {
+    const t = new ScreenTracker();
+    t.apply(frame({ clock: '90:00 +3:00', period: 'second_half' }), 0);
+    expect(t.toMatch()).toMatchObject({ minute: 93, extraTime: undefined });
+    t.apply(frame({ clock: '95:30', period: 'extra_time' }), 10_000);
+    t.apply(frame({ clock: '95:40', period: 'extra_time' }), 20_000);
+    expect(t.toMatch()).toMatchObject({ minute: 96, extraTime: true });
+    t.apply(frame({ clock: '96:10', period: 'unknown' }), 30_000); // a frame without the mark
+    expect(t.toMatch().extraTime).toBe(true);
+    t.apply(frame({ home_team: 'LIV', away_team: 'CHE', clock: '10:00', period: 'first_half' }), 40_000); // another match
+    expect(t.toMatch().extraTime).toBeUndefined();
+  });
+
   it('goes idle only after ten minutes without any frame', () => {
     const t = new ScreenTracker();
     t.apply(frame(), 0);
